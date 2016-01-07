@@ -20,7 +20,7 @@ class user_defined_exception(Exception):
 
 
 
-class dataset(object):
+class conn(object):
     """Storage class for datasets with multiple attributes.
 
     A dataset consists of three pieces: data matrix, coords and cond.
@@ -38,10 +38,11 @@ class dataset(object):
     cond : Design info for each sample (e.g., TR), NxC array. C is the number of conditions
 
     """
-    def __init__(self, targ_img, mask_img, cond=None):
+    def __init__(self, targ_img, mask_img, level = 'roi', cond=None):
         """
         targ_img: A 4D Nifti images object
         mask_img: A 3D Nifti images object
+        level: indicate the level of connectivity, i.e., roi or voxel
         cond: NxC array
         """
         if len(targ_img.get_shape()) != 4:
@@ -52,14 +53,53 @@ class dataset(object):
         vol = targ_img.get_data()
         mask = mask_img.get_data()
 
-        self.tc = vol[mask.astype(np.bool), :]
+        self.level = level
 
-        self.label = mask[mask.astype(np.bool), :]
+        if self.level == 'voxel':
+            self.tc = vol[mask.astype(np.bool), :]
+            self.label = mask[mask.astype(np.bool), :]
 
+        elif self.level == 'roi'
+            print 'roi'
 
-        self.coord = np.nonzero(mask) * targ_img.get_affine()
+        else:
+            print 'wrong level'
+
+        self.header = targ_img.header
+
+        self.coord = np.nonzero(mask)
 
         self.cond = cond
+
+
+
+
+    def comp_conn(self,metric = 'pearson', tm = False):
+        if not tm:
+            if self.metrc == 'pearson':
+                conn_mat =  stats.pearsonr(ds.tc,'correlation')
+
+            elif self.metric == 'wavelet':
+                    print 'wavelet'
+        else:
+            cond_num = ds.cond.shape[1]
+            # calculate connectivity
+            for c in range(0,cond_num):
+                conn_mat = weightedcorr(ds.tc,ds.cond[:,c])
+
+        conn.cm = conn_mat
+
+    def meas_conn(self):
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -74,3 +114,9 @@ class dataset(object):
 
     def  set_label(self, label):
         self.label = label
+
+    def set_header(self,header):
+        self.header = header
+
+
+
