@@ -3,10 +3,11 @@
 
 """Extract time series for connectivity computation. """
 
+import os
+
 import nibabel as nib
 import numpy as np
-from scipy import spatial as sp
-import numpy as np
+from scipy import stats
 
 
 def load_files(in_files):
@@ -16,12 +17,6 @@ def load_files(in_files):
     mask = nib.load(mask_file)
 
     return vol,mask
-
-def save_Nifti_files(imgs, filepath):
-    i = 0
-    for index in imgs:
-        nib.save(index, filepath+ '/'+str(i)+'.nii.gz')
-        i = i+1
 
 
 
@@ -35,41 +30,49 @@ class user_defined_exception(Exception):
 
 
 class cpa(object):
-    """Storage class for datasets with multiple attributes.
-
-    A dataset consists of three pieces: data matrix, coords and cond.
-
+    """
+    Connectivity pattern analysis(cpa) class
 
     Attributes
     ----------
-    tc : Time courses for all nodes(NxM array). N is the number of samples(e.g., TR),
-        M is the number of nodes(e.g., roi)
-
-    coord : Spatial coordinates for all nodes(3xM array)
-
-    label: label ID for each node(Mx1 array)
-
-    cond : Design info for each sample (e.g., TR), NxC array. C is the number of conditions
-
+    ds : data set to compute the connectivity
+    conn : connectivity pattern
+    meas: measures for the connectivity pattern
     """
     def __init__(self, targ_img_file, mask_img_file,cond_file = None):
+
         """
-        targ_img: A 4D Nifti images object
-        mask_img: A 3D Nifti images object
-        level: indicate the level of connectivity, i.e., roi or voxel
-        cond: NxC array
+        Parameters
+        ----------
+        targ_img_file: target image file
+        mask_img_file: mask image file
+        cond_file: condtion file
+
+        Returns
+        -------
+
         """
+
 
         self.file.targ_img = targ_img_file
-
         self.file.mask_img = mask_img_file
-
         self.file.cond = cond_file
 
 
     def extract_ds(self, level = 'voxel'):
-        # node level
-        self.ds.evel = level
+        """
+
+        Parameters
+        ----------
+        level: node level, i.e., voxel or level
+
+        Returns
+        -------
+
+        """
+
+
+        self.ds.level = level
 
         # load target image
         targ_img = nib.load(self.file.targ_img)
@@ -108,52 +111,106 @@ class cpa(object):
         self.ds.cond = cond
 
     def comp_conn(self,metric = 'pearson', tm = False):
+        """
+
+        Parameters
+        ----------
+        metric: metric to compute connnectivity,str
+        tm: task modulation, bool value
+
+        Returns
+        -------
+
+        """
         self.conn.metric =  metric
         self.conn.tm = tm
         if not tm:
             if self.metrc == 'pearson':
-                conn_mat =  stats.pearsonr(ds.tc,'correlation')
+                mat =  stats.pearsonr(self.ds.tc,'correlation')
 
             elif self.metric == 'wavelet':
                 print 'wavelet'
         else:
             cond_num = self.ds.cond.shape[1]
-            # calculate connectivity
+            # calculate weighted correlation for each condition
             for c in range(0,cond_num):
-                conn_mat = weightedcorr(self.ds.tc,self.ds.cond[:,c])
+                mat = weighted_corr(self.ds.tc,self.ds.cond[:,c])
 
 
-        self.conn.cm = conn_mat
+        self.conn.mat = mat
 
 
-    def meas_conn(self,metric = ['sum'], thr = None, graph_type = 'weighted'):
+    def meas_conn(self,metric = 'sum', thr = None, module = None, ntype = 'weighted'):
+        """
+
+        Parameters
+        ----------
+        metric: metric to measure the connectivity pattern,str
+        thr: threshold, scalar
+        module: module assignment, 1-D array
+        type: network type, str
+
+        Returns
+        -------
+
+        """
         self.meas.metric = metric
+        if self.meas.metric == 'sum':
+            comp_meas = np.nansum
+        elif self.meas.metric == 'std':
+            comp_meas = np.std
+        elif self.meas.metric == 'skewness':
+            comp_meas = stats.skew
+        elif self.meas.metric == 'kurtosis':
+            comp_meas= stats.kurtosis
+
         self.meas.thr = thr
-        self.meas.graph_type = graph_type
-
         if thr is not None:
-            cm = self.conn.cm > thr
+            mat = self.conn.mat > thr
 
-        if graph_type == 'weighted':
-            cm = cm.* self.conn.cm
+        self.meas.ntype = type
+        if ntype == 'weighted':
+            mat = np.multiply(mat,self.conn.mat)
 
-         if metric == 'sum':
-             corr_strength = np.nansum(cm, axis=1)
-         elif index == 'std':
-             corr_strength = np.std(cm, axis=1)
-         elif index == 'skewness':
-             corr_strength = stats.skew(cm, axis=1, bias=False)
-         elif index == 'kurtosis':
-             corr_strength = stats.kurtosis(cm, axis=1, bias=False)
+        # module ID for each node
+        if module is None:
+            module = np.ones(self.conn.mat.shape[0])
+        self.meas.module = module;
 
-        return self.conn.corr_str
 
-    def save_conn(self, map):
+        M = np.unique(self.meas.module)
+        self.meas.value = []
+
+        for i in M:
+            I = np.asarray(self.meas.module == i).T
+            for j in M:
+                J = np.asarray(self.meas.module == j)
+                sub_mat = mat[I].reshape(I.shape[0],-1)[:,J].reshape(I.shape[0],-1)
+
+        self.meas.value.append(comp_meas(sub_mat))
+
+    def save_conn(self, outdir):
+        """
+
+        Parameters
+        ----------
+        outdir: dir to save the connectivity measures
+
+        Returns
+        -------
+
+        """
+        if self.ds.level == 'roi':
+        # save meas.value as txt
+
+        elif self.ds.level == 'voxel':
+            # reshape meas.value and save it as nii
+            nib.save(self.meas,os.path.join(outdir,self.meas.metric+'.nii.gz'))
 
 
 
     def meas_anat(self):
-
+        print 'anat measure'
 
 
 
