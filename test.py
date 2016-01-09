@@ -3,7 +3,7 @@
 
 "Test for connectivity pattern analysis"
 
-import cpa as cpa
+from cpa import *
 import numpy as np
 from scipy import spatial as sp
 
@@ -12,9 +12,26 @@ targ_img_file = '/nfs/j3/userhome/zhenzonglei/workingdir/bn/S0001/mem/002/func.f
 mask_img_file = ''
 cond_file = ''
 
+outdir = ''
 
-mycpa = cpa(targ_img_file,mask_img_file,cond_file)
-mycpa.extraxt_ds()
-mycpa.comp_conn()
-mycpa.meas_conn()
-mycpa.save()
+# define dataset
+ds = DataSet(targ_img_file, mask_img_file,cond_file = None)
+ds.load()
+
+# define connectivity
+conn = Connectivity('pearson', False)
+
+# define measures
+meas = Measure('sum')
+
+# define cpa pipeline
+cpa = CPA(ds,conn,meas)
+
+# run cpa to compute conn
+cpa.comp_conn()
+
+# run cpa to measure conn
+cpa.meas_conn()
+
+# save conn
+cpa.save_conn(outdir)
