@@ -33,5 +33,5 @@ cpa.comp_conn()
 # run cpa to measure conn
 cpa.meas_conn()
 
-# save conn
-cpa.save_conn(outdir)
+# save connS
+cpa.save(outdir)

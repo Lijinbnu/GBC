@@ -1,27 +1,16 @@
 # emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
 # vi: set ft=python sts=4 ts=4 sw=4 et:l
 
-"""Extract time series for connectivity computation. """
+"""Connectivity pattern analysis pipeline. """
 
 import os
-
 import nibabel as nib
 import numpy as np
 from scipy import stats
 
 
-def load_files(in_files):
-    vol_file = in_files[0]
-    mask_file = in_files[1]
-    vol = nib.load(vol_file)
-    mask = nib.load(mask_file)
-
-    return vol,mask
-
-
-
-class user_defined_exception(Exception):
-    """User defined exception.
+class CPAexception(Exception):
+    """CPA exception.
     """
     def __init__(self, str):
         Exception.__init__(self)
@@ -47,6 +36,8 @@ class DataSet(object):
         self.fmask_img = mask_img_file
         self.fcond = cond_file
         self.tc = []
+        self.label = []
+        self.header = []
 
 
     def load(self, level = 'voxel'):
@@ -60,24 +51,21 @@ class DataSet(object):
         -------
 
         """
-
-
-        self.level = level
         # load target image
         targ_img = nib.load(self.ftarg_img)
         if len(targ_img.get_shape()) != 4:
-            raise user_defined_exception('targ_img is not a Nifti image about 4D volume!')
+            raise CPAexception('targ_img is not a Nifti image about 4D volume!')
         targ = targ_img.get_data()
+        self.header = targ_img.header
 
         # load  mask image
         mask_img = nib.load(self.fmask_img)
         if len(mask_img.get_shape()) != 3:
-            raise user_defined_exception('mask_img is not a Nifti image about 3D volume!')
+            raise CPAexception('mask_img is not a Nifti image about 3D volume!')
         mask = mask_img.get_data()
 
-        self.header = targ_img.header
-        self.coord = np.nonzero(mask)
 
+        self.level = level
         if self.level == 'voxel':
             self.tc = targ[mask.astype(np.bool), :]
             # label for each non-zeros voxel
@@ -89,15 +77,40 @@ class DataSet(object):
             self.label = label[1:]
             # compute ROI time course
             tc = np.zeros(targ_img.get_shape()[3], len(self.label))
-            for i in self.label:
+            for i in range(0,len(self.label)):
                 tc[:,i] =  np.mean(targ[mask[mask.astype(np.bool)] == i,:])
             self.tc = tc
         else:
             print 'wrong level'
 
 
+        #Read design matrix from design.mat file
+        if self.fcond is not None:
+            self.cond = np.loadtxt(self.fcond,skiprows=5)
+
+            #Choose first, third and fifth column as input weights
+            # dm = dm[:,[0,2,4]]
+
+
+
+
         # read cond file and assigh cond array to ds.cond
         self.cond = 'cond'
+
+
+
+    def set_tc(self, tc):
+        self.tc = tc
+
+    def set_cond(self,cond):
+        self.cond = cond
+
+    def  set_label(self, label):
+        self.label = label
+
+    def set_header(self,header):
+        self.header = header
+
 
 
 class Connectivity(object):
@@ -117,11 +130,7 @@ class Connectivity(object):
             cond_num = ds.cond.shape[1]
             # calculate weighted correlation for each condition
             for c in range(0,cond_num):
-                self.mat = weighted_corr(ds.tc,ds.cond[:,c])
-
-
-
-
+                self.mat = 'weighted_corr(ds.tc,ds.cond[:,c])'
 
 
  class Measure(object):
@@ -187,9 +196,9 @@ class CPA(object):
 
     Attributes
     ----------
-    ds : data set to compute the connectivity
-    conn : connectivity pattern
-    meas: measures for the connectivity pattern
+    ds : DataSet object
+    conn : Connectivity object
+    meas: Measure object
 
     """
     def __init__(self, dataset, conn, measure):
@@ -210,20 +219,29 @@ class CPA(object):
 
 
     def comp_conn(self):
-
+        # compute connectivity pattern
         self.conn.compute(self.ds)
 
 
 
     def meas_conn(self, thr = None, module = None):
+        """
+        measure connectivity pattern
 
+        Parameters
+        ----------
+        thr: threshold to remove moise edge, scalar
+        module: module assignment
+
+        Returns
+        -------
+
+        """
         self.meas.compute(self.conn, thr, module)
 
-
-
-    def save_conn(self, outdir):
+    def save(self, outdir):
         """
-
+        Save measure value to hard disk
         Parameters
         ----------
         outdir: dir to save the connectivity measures
@@ -241,24 +259,5 @@ class CPA(object):
 
 
 
-    def meas_anat(self):
-        print 'anat measure'
-
-
-
-
-
-    def set_tc(self, tc):
-        self.tc = tc
-
-    def set_cond(self,cond):
-        self.cond = cond
-
-    def set_coord(self, coord):
-        self.coord = coord
-
-    def  set_label(self, label):
-        self.label = label
-
-    def set_header(self,header):
-        self.header = header
+    # def meas_anat(self):
+    #     print 'anat measure'
