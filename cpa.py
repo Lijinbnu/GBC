@@ -116,7 +116,7 @@ class DataSet(object):
      
 
 class Connectivity(object):
-    def __init__(self, ds, metric = 'pearson', tm = False):
+    def __init__(self, ds, metric='pearson', tm=False):
         self.metric = metric
         self.tm = tm
         self.mat = np.zeros((ds.label.shape[0], ds.label.shape[0]))
@@ -146,7 +146,7 @@ class Connectivity(object):
 
 
 class Measure(object):
-    def __init__(self, ds, conn, metric = 'sum', ntype = 'weighted'):
+    def __init__(self, ds, conn, metric='sum', ntype='weighted'):
         
         self.metric = metric
         mat = conn.mat
@@ -172,7 +172,9 @@ class Measure(object):
         self.value = []
         self.index = []
 
-        if self.thr is None:
+        if self.thr is None and (self.ntype == 'binary'):
+            raise user_defined_exception('you should set threshold for binary image!')
+        elif self.thr is None and (self.ntype == 'weighted'):
             mat = conn.mat
         else:
             if self.ntype == 'binary':
