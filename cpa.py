@@ -176,10 +176,10 @@ class Measure(object):
             mat = conn.mat
         else:
             if self.ntype == 'binary':
-                mat = conn.mat >= threshold
+                mat = conn.mat >= self.thr
               #  mat[mat == 0] = np.nan
             else:
-                mat = conn.mat*(conn.mat >= threshold)
+                mat = conn.mat*(conn.mat >= self.thr)
                 mat[mat == 0] = np.nan
         
         for i in np.unique(ds.module):
