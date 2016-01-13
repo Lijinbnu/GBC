@@ -1,263 +1,233 @@
-# emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
-# vi: set ft=python sts=4 ts=4 sw=4 et:l
-
-"""Connectivity pattern analysis pipeline. """
-
 import os
 import nibabel as nib
 import numpy as np
+from scipy import spatial as sp
 from scipy import stats
+from statsmodels.stats.weightstats import DescrStatsW
 
+class user_defined_exception(Exception):
 
-class CPAexception(Exception):
-    """CPA exception.
-    """
     def __init__(self, str):
         Exception.__init__(self)
         self._str = str
 
+# define each sub structures
+#
+##class file(object):
+##   def __init__(self):
+#        pass
+#
+#class ts(object):
+#    def __init__(self):
+#        pass
+#
+#class conn(object):
+#    def __init__(self):
+#        pass
+#
+
 
 
 class DataSet(object):
-    def __init__(self, targ_img_file, mask_img_file, cond_file = None):
+    
+    def __init__(self, targ_img_file, node_img_file, cond_file=None):
 
-        """
-        Parameters
-        ----------
-        targ_img_file: target image file
-        mask_img_file: mask image file
-        cond_file: condtion file
-
-        Returns
-        -------
-
-        """
         self.ftarg_img = targ_img_file
-        self.fmask_img = mask_img_file
+        self.fnode_img = node_img_file
         self.fcond = cond_file
         self.tc = []
+        self.affine = []
         self.label = []
-        self.header = []
 
+    def load(self, level='voxel', module_file=None):
 
-    def load(self, level = 'voxel'):
-        """
+        self.fmodule = module_file
 
-        Parameters
-        ----------
-        level: node level, i.e., voxel or level
-
-        Returns
-        -------
-
-        """
         # load target image
         targ_img = nib.load(self.ftarg_img)
         if len(targ_img.get_shape()) != 4:
-            raise CPAexception('targ_img is not a Nifti image about 4D volume!')
+            raise user_defined_exception('targ_img is not a Nifti image about 4D volume!')
         targ = targ_img.get_data()
-        self.header = targ_img.header
+        self.affine = targ_img.get_affine()
 
-        # load  mask image
-        mask_img = nib.load(self.fmask_img)
-        if len(mask_img.get_shape()) != 3:
-            raise CPAexception('mask_img is not a Nifti image about 3D volume!')
-        mask = mask_img.get_data()
-
+        # load node image
+        node_img = nib.load(self.fnode_img)
+        if len(node_img.get_shape()) != 3:
+            raise user_defined_exception('node_img is not a Nifti image about 3D volume!')
+        node = node_img.get_data()
 
         self.level = level
         if self.level == 'voxel':
-            self.tc = targ[mask.astype(np.bool), :]
-            # label for each non-zeros voxel
-            self.label = mask[mask.astype(np.bool), :]
+            self.label = node[node.astype(np.bool)]
+            if self.fmodule is not None:
+                module_img = nib.load(self.fmodule)
+                module = module_img.get_data()
+                self.module = module[module.astype(np.bool)]
+            else:
+                self.module = node[node.astype(np.bool)]
+            
+            self.tc = targ[node.astype(np.bool),:]
 
         elif self.level == 'roi':
-            label  = np.unique(mask)
-            # label for each ROI
+            label = np.unique(node)
             self.label = label[1:]
-            # compute ROI time course
-            tc = np.zeros(targ_img.get_shape()[3], len(self.label))
+            if self.fmodule is not None:
+                self.module = np.loadtxt(self.fmodule)
+            else:
+                self.module = np.ones(self.label[0])
+
+            tc = np.zeros(self.label,targ_img.get_shape()[3])
             for i in range(0,len(self.label)):
-                tc[:,i] =  np.mean(targ[mask[mask.astype(np.bool)] == i,:])
+                tc[i,:] = np.mean(targ[node[node.astype(np.bool)] == i,:])
             self.tc = tc
         else:
             print 'wrong level'
-
-
+       
         #Read design matrix from design.mat file
         if self.fcond is not None:
-            self.cond = np.loadtxt(self.fcond,skiprows=5)
+            self.cond = np.loadtxt(self.fcond, skiprows=5)
 
-            #Choose first, third and fifth column as input weights
-            # dm = dm[:,[0,2,4]]
-
-
-
-
-        # read cond file and assigh cond array to ds.cond
-        self.cond = 'cond'
-
-
-
-    def set_tc(self, tc):
-        self.tc = tc
-
-    def set_cond(self,cond):
-        self.cond = cond
-
-    def  set_label(self, label):
-        self.label = label
-
-    def set_header(self,header):
-        self.header = header
+    def set_module(self, module_file):
+        self.fmodule = module_file
+        if self.level == 'voxel':
+            module_img = nib.load(self.fmodule)
+            module = module_img.get_data()
+            self.module = module[module.astype(np.bool)]
+        elif self.level == 'roi':
+            self.module = np.loadtxt(self.fmodule)
 
 
+
+
+
+        #self.cond = 'cond'
+    
+    #def set_tc(self, tc):
+    #    self.tc = tc
+
+    #def set_cond(self, cond):
+    #    self.cond = cond
+
+    #def set_label(self, label):
+    #    self.label = label
+
+    #def set_header(self, header):
+    #    self.header = header
+     
 
 class Connectivity(object):
-    def __init__(self, metric = 'pearson', tm = False):
+    def __init__(self, ds, metric = 'pearson', tm = False):
         self.metric = metric
         self.tm = tm
-        self.mat = []
+        self.mat = np.zeros((ds.label.shape[0], ds.label.shape[0]))
 
-    def compute(self,ds):
+    def compute(self, ds):
         if not self.tm:
             if self.metric == 'pearson':
-                self.mat =  stats.pearsonr(ds.tc,'correlation')
-
+                corr = 1 - sp.distance.pdist(ds.tc, 'correlation')
+                self.mat = sp.distance.squareform(corr)
             elif self.metric == 'wavelet':
-                self.mat = 'wavelet'
+                pass
         else:
-            cond_num = ds.cond.shape[1]
-            # calculate weighted correlation for each condition
-            for c in range(0,cond_num):
-                self.mat = 'weighted_corr(ds.tc,ds.cond[:,c])'
+            if ds.cond.ndim == 1:
+                cond_num = 1
+            else:
+                cond_num = ds.cond.shape[1]
+            for condition in range(0, cond_num):
+                weights = cond[:,condition]
+                weights = weights - np.min(weights)
+                weights = weights/np.sum(weights)
+                d1 = DescrStatsW(ds.tc.T, weights=weights)
+                cov = np.dot(weights*d1.demeaned.T, d1.demeaned)
+                corr = cov/d1.std/d1.std[:,None]
+                self.mat = corr - np.eye(corr.shape[0], dtype=float)
 
 
- class Measure(object):
-     def __init__(self, metric = 'sum', ntype = 'weighted'):
-        """
 
-        Parameters
-        ----------
-        metric: metric to measure the connectivity pattern,str
-        thr: threshold, scalar
-        module: module assignment, 1-D array
-        type: network type, str
 
-        Returns
-        -------
-
-        """
+class Measure(object):
+    def __init__(self, ds, conn, metric = 'sum', ntype = 'weighted'):
+        
         self.metric = metric
+        mat = conn.mat
+        mat[np.diag_indices_from(mat)] = np.nan
+        
         if self.metric == 'sum':
-            self.cpu = np.nansum
+            self.cpu = np.nansum(mat, axis=1)
         elif self.metric == 'std':
-            self.cpu = np.std
+            self.cpu = np.nanstd(mat, axis=1)
         elif self.metric == 'skewness':
-            self.cpu = stats.skew
+            masked = np.ma.masked_array(mat, np.isnan(mat))
+            self.cpu = stats.skew(masked, axis=1)
         elif self.metric == 'kurtosis':
-            self.cpu= stats.kurtosis
+            masked = np.ma.masked_array(mat, np.isnan(mat))
+            self.cpu = stats.skew(masked, axis=1)
 
         self.ntype = ntype
         self.thr = []
-        self.module = []
 
+    def compute(self, ds, conn, thr=None):
 
-     def compute(self,conn, thr = None, module = None):
+        self.thr = thr
+        self.value = []
+        self.index = []
 
-         self.thr = thr
-         if self.thr is None:
-             mat = conn.mat
-         else:
-             mat = conn.mat > thr
+        if self.thr is None:
+            mat = conn.mat
+        else:
+            if self.ntype == 'binary':
+                mat = conn.mat >= threshold
+              #  mat[mat == 0] = np.nan
+            else:
+                mat = conn.mat*(conn.mat >= threshold)
+                mat[mat == 0] = np.nan
+        
+        for i in np.unique(ds.module):
+           i_index = np.asarray(np.nonzero(ds.module == i)).T
+           for j in np.unique(ds.module):
+               j_index = np.asarray(np.nonzero(ds.module == j)).T
+               sub_mat = np.zeros((i_index.shape[0],j_index.shape[1]),dtype=float)
+               sub_mat = mat[i_index].reshape(i_index.shape[0],-1)[:,j_index].reshape(i_index.shape[0],-1)
+               if self.metric == 'sum':
+                   cpu = np.nansum(sub_mat, axis=1)
+               elif self.metric == 'std' and self.ntype == 'weighted':
+                   cpu = np.nanstd(sub_mat, axis=1)
+               elif self.metric == 'skewness' and self.ntype == 'weighted':
+                   masked = np.ma.masked_array(sub_mat, np.isnan(sub_mat))
+                   cpu = stats.skew(masked, axis=1)
+               elif self.metric == 'kurtosis' and self.ntype == 'weighted':
+                   masked = np.ma.masked_array(sub_mat, np.isnan(sub_mat))
+                   cpu = stats.skew(masked, axis=1)
 
-         if self.ntype == 'weighted':
-             mat = np.multiply(mat,conn.mat)
-
-         # module ID for each node
-         if module is None:
-             module = np.ones(conn.mat.shape[0])
-         self.module = module
-
-         M = np.unique(self.module)
-         self.value = []
-         for i in M:
-             I = np.asarray(self.module == i).T
-             for j in M:
-                 J = np.asarray(self.module == j)
-                 sub_mat = mat[I].reshape(I.shape[0],-1)[:,J].reshape(I.shape[0],-1)
-
-                 self.value.append(self.cpu(sub_mat))
+               self.value.append(cpu)
+               self.index.append([i,j])
 
 
 class CPA(object):
-    """
-    Connectivity pattern analysis(cpa) class
-
-    Attributes
-    ----------
-    ds : DataSet object
-    conn : Connectivity object
-    meas: Measure object
-
-    """
-    def __init__(self, dataset, conn, measure):
-
-        """
-        Parameters
-        ----------
-        dataset: a dataset object
-
-        Returns
-        -------
-
-        """
-
-        self.ds = dataset
+    def __init__(self, ds, conn, meas):
+        self.ds = ds
         self.conn = conn
-        self.meas = measure
-
+        self.meas = meas
 
     def comp_conn(self):
-        # compute connectivity pattern
         self.conn.compute(self.ds)
 
-
-
-    def meas_conn(self, thr = None, module = None):
-        """
-        measure connectivity pattern
-
-        Parameters
-        ----------
-        thr: threshold to remove moise edge, scalar
-        module: module assignment
-
-        Returns
-        -------
-
-        """
-        self.meas.compute(self.conn, thr, module)
+    def meas_conn(self, thr=None):
+        self.meas.compute(self.ds, self.conn, thr)
 
     def save(self, outdir):
-        """
-        Save measure value to hard disk
-        Parameters
-        ----------
-        outdir: dir to save the connectivity measures
-
-        Returns
-        -------
-
-        """
         if self.ds.level == 'roi':
-        # save meas.value as txt
+            for i in range(0, len(self.meas.value)):
+                index = self.meas.index[i]
+                np.savetxt(outdir+'/'+'roi'+'-'+str(index[0])+'to'+str(index[1]), self.meas.value[i])
 
         elif self.ds.level == 'voxel':
-            # reshape meas.value and save it as nii
-            nib.save(self.meas,os.path.join(outdir,self.meas.metric+'.nii.gz'))
+            node_img = nib.load(self.ds.fnode_img)
+            node = node_img.get_data()
+            cell = np.zeros((node.shape[0],node.shape[1],node.shape[2]))
+            for i in range(0, len(self.meas.value)):
+                index = self.meas.index[i]
+                cell[(node == index[0]).astype(np.bool)] = self.meas.value[i]
+                img = nib.Nifti1Image(cell, self.ds.affine)
+                img.to_filename(os.path.join(outdir,self.meas.metric+'-'+str(index[0])+'to'+str(index[1])+'.nii.gz'))
 
-
-
-    # def meas_anat(self):
-    #     print 'anat measure'
