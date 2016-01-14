@@ -22,17 +22,6 @@ conn.compute(ds)
 # define measures
 meas = Measure('sum')
 meas.compute(conn)
-print len(meas.value)
 
-# # define cpa pipeline
-# cpa = CPA(ds,conn,meas)
-#
-# # run cpa to compute conn
-# cpa.comp_conn()
-#
-# # run cpa to measure conn
-# cpa.meas_conn()
-#
-# # save conn
 # outdir = ''
-# cpa.save(outdir)
+meas.save(ds)
