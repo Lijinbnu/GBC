@@ -78,7 +78,6 @@ class DataSet(object):
             for i in range(0,self.nid.shape[0]):
                 tc[i,:] = np.mean(targ[node == i,:],axis=0)
             self.tc = tc
-            print tc
         else:
             self.tc = []
             raise UserDefinedException('Wrong level! it should be voxel or roi.')
@@ -210,42 +209,42 @@ class Measure(object):
 
         P = np.unique(self.partition)
         for i in P:
-           I = np.asarray(np.nonzero(self.partition == i)).T
+           I = np.nonzero(self.partition == i)
            for j in P:
-               J = np.asarray(np.nonzero(self.partition == j)).T
-               sub_mat = mat[I, J]
+               J = np.nonzero(self.partition == j)
+               sub_mat = mat[np.ix_(I[0], J[0])]
                self.value.append(self.cpu(sub_mat,axis=1))
 
-#
-# class CPA(object):
-#     def __init__(self, ds, conn, meas):
-#         self.ds = ds
-#         self.conn = conn
-#         self.meas = meas
-#
-#     def comp_conn(self):
-#         self.conn.compute(self.ds)
-#
-#     def meas_conn(self, thr=None):
-#         self.meas.compute(self.ds, self.conn, thr)
-#
-#     def save(self, outdir):
-#         if self.ds.level == 'roi':
-#             for i in range(0, len(self.meas.value)):
-#                 index = self.meas.index[i]
-#                 np.savetxt(outdir+'/'+'roi'+'-'+str(index[0])+'to'+str(index[1]), self.meas.value[i])
-#
-#         elif self.ds.level == 'voxel':
-#             if self.ds.fmodule is not None:
-#                 module_img = nib.load(self.ds.fmodule)
-#                 module = module_img.get_data()
-#             else:
-#                 module_img = nib.load(self.ds.fnode_img)
-#                 module = module_img.get_data()
-#             cell = np.zeros((module.shape[0],module.shape[1],module.shape[2]))
-#             for i in range(0, len(self.meas.value)):
-#                 index = self.meas.index[i]
-#                 cell[(module == index[0]).astype(np.bool)] = self.meas.value[i]
-#                 img = nib.Nifti1Image(cell, self.ds.affine)
-#                 img.to_filename(os.path.join(outdir,self.meas.metric+'-'+str(index[0])+'to'+str(index[1])+'.nii.gz'))
+
+class CPA(object):
+    def __init__(self, ds, conn, meas):
+        self.ds = ds
+        self.conn = conn
+        self.meas = meas
+
+    def comp_conn(self):
+        self.conn.compute(self.ds)
+
+    def meas_conn(self, thr=None):
+        self.meas.compute(self.ds, self.conn, thr)
+
+    def save(self, outdir):
+        if self.ds.level == 'roi':
+            for i in range(0, len(self.meas.value)):
+                index = self.meas.index[i]
+                np.savetxt(outdir+'/'+'roi'+'-'+str(index[0])+'to'+str(index[1]), self.meas.value[i])
+
+        elif self.ds.level == 'voxel':
+            if self.ds.fmodule is not None:
+                module_img = nib.load(self.ds.fmodule)
+                module = module_img.get_data()
+            else:
+                module_img = nib.load(self.ds.fnode_img)
+                module = module_img.get_data()
+            cell = np.zeros((module.shape[0],module.shape[1],module.shape[2]))
+            for i in range(0, len(self.meas.value)):
+                index = self.meas.index[i]
+                cell[(module == index[0]).astype(np.bool)] = self.meas.value[i]
+                img = nib.Nifti1Image(cell, self.ds.affine)
+                img.to_filename(os.path.join(outdir,self.meas.metric+'-'+str(index[0])+'to'+str(index[1])+'.nii.gz'))
 #
