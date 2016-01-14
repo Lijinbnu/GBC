@@ -224,12 +224,16 @@ class CPA(object):
                 np.savetxt(outdir+'/'+'roi'+'-'+str(index[0])+'to'+str(index[1]), self.meas.value[i])
 
         elif self.ds.level == 'voxel':
-            node_img = nib.load(self.ds.fnode_img)
-            node = node_img.get_data()
-            cell = np.zeros((node.shape[0],node.shape[1],node.shape[2]))
+            if self.ds.fmodule is not None:
+                module_img = nib.load(self.ds.fmodule)
+                module = module_img.get_data()
+            else:
+                module_img = nib.load(self.ds.fnode_img)
+                module = module_img.get_data()
+            cell = np.zeros((module.shape[0],module.shape[1],module.shape[2]))
             for i in range(0, len(self.meas.value)):
                 index = self.meas.index[i]
-                cell[(node == index[0]).astype(np.bool)] = self.meas.value[i]
+                cell[(module == index[0]).astype(np.bool)] = self.meas.value[i]
                 img = nib.Nifti1Image(cell, self.ds.affine)
                 img.to_filename(os.path.join(outdir,self.meas.metric+'-'+str(index[0])+'to'+str(index[1])+'.nii.gz'))
 
