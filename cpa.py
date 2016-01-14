@@ -6,7 +6,19 @@ from scipy import stats
 
 
 class UserDefinedException(Exception):
+    """
+    Exception defined by user
+    """
     def __init__(self, str):
+        """
+
+        Parameters
+        ----------
+        str : a string to indicate the exception
+
+        -------
+
+        """
         Exception.__init__(self)
         self._str = str
 
@@ -44,12 +56,11 @@ class DataSet(object):
 
         Parameters
         ----------
-        targ_img_file
-        node_img_file
-        level
-        cond_file
+        targ_img_file : target image file, str
+        mask_img_file : mask image file, str
+        cond_file : condition file, str
+        level : level of interest, str, voxel or roi
 
-        Returns
         -------
 
         """
@@ -67,10 +78,12 @@ class DataSet(object):
         node = node_img.get_data()
 
         self.level = level
+        # extract tc for voxel
         if self.level == 'voxel':
             self.nid = node[node.astype(np.bool)]
             self.tc = targ[node.astype(np.bool),:]
 
+        # extract tc for roi
         elif self.level == 'roi':
             nid = np.unique(node)
             self.nid = nid[1:]
@@ -82,7 +95,7 @@ class DataSet(object):
             self.tc = []
             raise UserDefinedException('Wrong level! it should be voxel or roi.')
 
-        # Read design matrix from design.mat file
+        # Read design matrix from design file
         if cond_file is not None:
             cond = np.loadtxt(cond_file, skiprows=5)
             self.cond  = cond[:, np.arange(0, cond.shape[1]-6, 2)]
@@ -181,12 +194,10 @@ class Measure(object):
 
         Parameters
         ----------
-        conn
-        thr
-        partition: node partition, 1-D array
+        conn : Connectivity object
+        thr : threshod to remove non-interest edge, scalar
+        partition : node partition, 1-D array
 
-        Returns
-        -------
 
         """
 
@@ -207,44 +218,54 @@ class Measure(object):
         else:
             self.partition = partition
 
-        P = np.unique(self.partition)
+        P = np.unique(self.partition).tolist()
         for i in P:
-           I = np.nonzero(self.partition == i)
+           I = np.where(self.partition == i)
            for j in P:
-               J = np.nonzero(self.partition == j)
+               J = np.where(self.partition == j)
                sub_mat = mat[np.ix_(I[0], J[0])]
                self.value.append(self.cpu(sub_mat,axis=1))
 
+    def save(self, ds, outdir='.'):
+        """
 
-class CPA(object):
-    def __init__(self, ds, conn, meas):
-        self.ds = ds
-        self.conn = conn
-        self.meas = meas
+        Parameters
+        ----------
+        ds : DataSet object which the measure was based on
+        outdir : dir to save the measures
 
-    def comp_conn(self):
-        self.conn.compute(self.ds)
+        -------
 
-    def meas_conn(self, thr=None):
-        self.meas.compute(self.ds, self.conn, thr)
+        """
 
-    def save(self, outdir):
-        if self.ds.level == 'roi':
-            for i in range(0, len(self.meas.value)):
-                index = self.meas.index[i]
-                np.savetxt(outdir+'/'+'roi'+'-'+str(index[0])+'to'+str(index[1]), self.meas.value[i])
+        P = np.unique(self.partition).tolist()
+        NP = len(P)
+        if ds.level == 'roi':
+            # convert self.value to 2D array, every coloumn correspond a seed module
+            value = np.zeros((ds.nid.shape[0], NP * NP))
+            for i in P:
+                I = (self.partition == i)
+                for j in P:
+                    J = int((i-1) * NP + (j - 1))
+                    value[I, J] = self.value[J]
 
-        elif self.ds.level == 'voxel':
-            if self.ds.fmodule is not None:
-                module_img = nib.load(self.ds.fmodule)
-                module = module_img.get_data()
-            else:
-                module_img = nib.load(self.ds.fnode_img)
-                module = module_img.get_data()
-            cell = np.zeros((module.shape[0],module.shape[1],module.shape[2]))
-            for i in range(0, len(self.meas.value)):
-                index = self.meas.index[i]
-                cell[(module == index[0]).astype(np.bool)] = self.meas.value[i]
-                img = nib.Nifti1Image(cell, self.ds.affine)
-                img.to_filename(os.path.join(outdir,self.meas.metric+'-'+str(index[0])+'to'+str(index[1])+'.nii.gz'))
-#
+            np.savetxt(os.path.join(outdir,self.metric),value)
+
+        elif ds.level == 'voxel':
+            imgdim = ds.header.get_data_shape()
+            value = np.zeros((np.prod(imgdim), NP * NP))
+
+            # convert self.value to 4D array, every 3D volume correspond a seed module
+            for i in P:
+                I = (self.partition == i)
+                for j in P:
+                    J =  int((i-1) * NP + (j - 1))
+                    value[I, J] = self.value[J]
+
+            # save voxel-wise inter-module measure in 4D volume
+            value = np.reshape(value, (imgdim[0], imgdim[1], imgdim[2], NP*NP))
+            header = ds.header
+            header['cal_max'] = value.max()
+            header['cal_min'] = value.min()
+            img = nib.Nifti1Image(value, None, header)
+            nib.save(img, os.path.join(outdir,self.metric+'.nii.gz'))
