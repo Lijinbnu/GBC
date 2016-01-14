@@ -2,156 +2,158 @@ import os
 import nibabel as nib
 import numpy as np
 from scipy import spatial as sp
-from scipy import stats
-from statsmodels.stats.weightstats import DescrStatsW
 
-class user_defined_exception(Exception):
 
+class UserDefinedException(Exception):
     def __init__(self, str):
         Exception.__init__(self)
         self._str = str
 
-# define each sub structures
-#
-##class file(object):
-##   def __init__(self):
-#        pass
-#
-#class ts(object):
-#    def __init__(self):
-#        pass
-#
-#class conn(object):
-#    def __init__(self):
-#        pass
-#
 
+def pearson_correlation(D, w = None):
+    """
+
+    Parameters
+    ----------
+    D : A 2-D array containing multiple variables and observations.
+        Each column of `D` represents a variable, and each row a single
+        observation of all those variables.
+
+    w : 1-D array of observation vector weights.
+
+    Returns
+
+    R : 2-D array, the corrcoef matrix of the variables.
+    -------
+
+    """
+    print D
+    if w is None:
+        R = np.corrcoef(D)
+    else:
+        c = np.cov(D, aweights=w)
+        d = np.diag(c)
+        #print d
+        R = c / np.sqrt(np.outer(d, d))
+
+    return R
 
 
 class DataSet(object):
-    
-    def __init__(self, targ_img_file, node_img_file, cond_file=None):
+    def __init__(self, targ_img_file, node_img_file, level='voxel', cond_file=None):
+        """
 
-        self.ftarg_img = targ_img_file
-        self.fnode_img = node_img_file
-        self.fcond = cond_file
-        self.tc = []
-        self.affine = []
-        self.label = []
+        Parameters
+        ----------
+        targ_img_file
+        node_img_file
+        level
+        cond_file
 
-    def load(self, level='voxel', module_file=None):
+        Returns
+        -------
 
-        self.fmodule = module_file
-
+        """
         # load target image
-        targ_img = nib.load(self.ftarg_img)
+        targ_img = nib.load(targ_img_file)
         if len(targ_img.get_shape()) != 4:
-            raise user_defined_exception('targ_img is not a Nifti image about 4D volume!')
+            raise UserDefinedException('target image is not a 4D Nifti volume!')
         targ = targ_img.get_data()
-        self.affine = targ_img.get_affine()
+        self.header = targ_img.header
 
         # load node image
-        node_img = nib.load(self.fnode_img)
+        node_img = nib.load(node_img_file)
         if len(node_img.get_shape()) != 3:
-            raise user_defined_exception('node_img is not a Nifti image about 3D volume!')
+            raise UserDefinedException('node image is not a 3D Nifti volume!')
         node = node_img.get_data()
 
         self.level = level
         if self.level == 'voxel':
-            self.label = node[node.astype(np.bool)]
-            if self.fmodule is not None:
-                module_img = nib.load(self.fmodule)
-                module = module_img.get_data()
-                self.module = module[module.astype(np.bool)]
-            else:
-                self.module = node[node.astype(np.bool)]
-            
+            self.nid = node[node.astype(np.bool)]
             self.tc = targ[node.astype(np.bool),:]
 
         elif self.level == 'roi':
-            label = np.unique(node)
-            self.label = label[1:]
-            if self.fmodule is not None:
-                self.module = np.loadtxt(self.fmodule)
-            else:
-                self.module = np.ones(self.label[0])
-
-            tc = np.zeros(self.label,targ_img.get_shape()[3])
-            for i in range(0,len(self.label)):
-                tc[i,:] = np.mean(targ[node[node.astype(np.bool)] == i,:])
+            nid = np.unique(node)
+            self.nid = nid[1:]
+            tc = np.zeros(len(self.nid),targ_img.get_shape()[3])
+            for i in range(0,len(self.nid)):
+                tc[i,:] = np.mean(targ[node == i,:])
             self.tc = tc
         else:
-            print 'wrong level'
-       
-        #Read design matrix from design.mat file
-        if self.fcond is not None:
-            self.cond = np.loadtxt(self.fcond, skiprows=5)
+            self.tc = []
+            raise UserDefinedException('Wrong level! it should be voxel or roi.')
 
-    def set_module(self, module_file):
-        self.fmodule = module_file
-        if self.level == 'voxel':
-            module_img = nib.load(self.fmodule)
-            module = module_img.get_data()
-            self.module = module[module.astype(np.bool)]
-        elif self.level == 'roi':
-            self.module = np.loadtxt(self.fmodule)
+        # Read design matrix from design.mat file
+        if cond_file is not None:
+            cond = np.loadtxt(cond_file, skiprows=5)
+            self.cond  = cond[:, np.arange(0, cond.shape[1]-6, 2)]
+            print self.cond.shape
 
+    def set_tc(self, tc):
+        self.tc = tc
 
+    def set_cond(self, cond):
+        self.cond = cond
 
+    def set_nid(self, nid):
+        self.nid = nid
 
+    def set_header(self, header):
+       self.header = header
 
-        #self.cond = 'cond'
-    
-    #def set_tc(self, tc):
-    #    self.tc = tc
-
-    #def set_cond(self, cond):
-    #    self.cond = cond
-
-    #def set_label(self, label):
-    #    self.label = label
-
-    #def set_header(self, header):
-    #    self.header = header
-     
 
 class Connectivity(object):
-    def __init__(self, ds, metric='pearson', tm=False):
+    def __init__(self, metric='pearson', tm=False):
+        """
+
+        Parameters
+        ----------
+        ds
+        metric
+        tm
+
+
+        Returns
+        -------
+
+        """
+
         self.metric = metric
         self.tm = tm
-        self.mat = np.zeros((ds.label.shape[0], ds.label.shape[0]))
+        self.mat = []
 
     def compute(self, ds):
-        if not self.tm:
-            if self.metric == 'pearson':
-                corr = 1 - sp.distance.pdist(ds.tc, 'correlation')
-                self.mat = sp.distance.squareform(corr)
-            elif self.metric == 'wavelet':
-                pass
-        else:
-            if ds.cond.ndim == 1:
-                cond_num = 1
+        """
+
+        Parameters
+        ----------
+        ds : DataSet object
+
+        Returns
+        -------
+
+        """
+        if self.metric == 'pearson':
+            if not self.tm:
+                self.mat = pearson_correlation(ds.tc)
             else:
-                cond_num = ds.cond.shape[1]
-            for condition in range(0, cond_num):
-                weights = cond[:,condition]
-                weights = weights - np.min(weights)
-                weights = weights/np.sum(weights)
-                d1 = DescrStatsW(ds.tc.T, weights=weights)
-                cov = np.dot(weights*d1.demeaned.T, d1.demeaned)
-                corr = cov/d1.std/d1.std[:,None]
-                self.mat = corr - np.eye(corr.shape[0], dtype=float)
+                self.mat = np.zeros((ds.tc.shape[0],ds.tc.shape[0],ds.cond.shape[1]))
+                W = ds.cond
+                wmax, wmin = W.max(), W.min()
+                W = (W-wmin) / (wmax - wmin)
+                for c in range(0, W.shape[1]):
+                    self.mat[:, :, c] = pearson_correlation(ds.tc, W[:, c])
 
-
-
+        elif self.metric == 'wavelet':
+            print 'wavelet metric is not implemented'
 
 class Measure(object):
     def __init__(self, ds, conn, metric='sum', ntype='weighted'):
-        
+
         self.metric = metric
         mat = conn.mat
         mat[np.diag_indices_from(mat)] = np.nan
-        
+
         if self.metric == 'sum':
             self.cpu = np.nansum(mat, axis=1)
         elif self.metric == 'std':
@@ -183,7 +185,7 @@ class Measure(object):
             else:
                 mat = conn.mat*(conn.mat >= self.thr)
                 mat[mat == 0] = np.nan
-        
+
         for i in np.unique(ds.module):
            i_index = np.asarray(np.nonzero(ds.module == i)).T
            for j in np.unique(ds.module):

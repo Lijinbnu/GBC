@@ -4,34 +4,33 @@
 "Test for connectivity pattern analysis"
 
 from cpa import *
-import numpy as np
-from scipy import spatial as sp
 
 
-targ_img_file = '/nfs/j3/userhome/zhenzonglei/workingdir/bn/S0001/mem/002/func.feat/stanard_filtered_func_data.nii.gz'
-mask_img_file = ''
-cond_file = ''
+targ_img_file = './data/S0001_obj_004.nii.gz'
+node_img_file = './data/face.nii.gz'
+cond_file = './data/design.mat'
 
-outdir = ''
 
 # define dataset
-ds = DataSet(targ_img_file, mask_img_file,cond_file = None)
-ds.load()
+ds = DataSet(targ_img_file, node_img_file,'voxel',cond_file)
 
 # define connectivity
-conn = Connectivity('pearson', False)
+conn = Connectivity('pearson', True)
+conn.compute(ds)
 
-# define measures
-meas = Measure('sum')
-
-# define cpa pipeline
-cpa = CPA(ds,conn,meas)
-
-# run cpa to compute conn
-cpa.comp_conn()
-
-# run cpa to measure conn
-cpa.meas_conn()
-
-# save connS
-cpa.save(outdir)
+#
+# # define measures
+# meas = Measure('sum')
+#
+# # define cpa pipeline
+# cpa = CPA(ds,conn,meas)
+#
+# # run cpa to compute conn
+# cpa.comp_conn()
+#
+# # run cpa to measure conn
+# cpa.meas_conn()
+#
+# # save conn
+# outdir = ''
+# cpa.save(outdir)
