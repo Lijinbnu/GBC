@@ -144,90 +144,90 @@ class Connectivity(object):
 
         elif self.metric == 'wavelet':
             print 'wavelet metric is not implemented'
-#
-# class Measure(object):
-#     def __init__(self, ds, conn, metric = 'sum', ntype = 'weighted'):
-#
-#         self.metric = metric
-#         mat = conn.mat
-#         mat[np.diag_indices_from(mat)] = np.nan
-#
-#         if self.metric == 'sum':
-#             self.cpu = np.nansum(mat, axis=1)
-#         elif self.metric == 'std':
-#             self.cpu = np.nanstd(mat, axis=1)
-#         elif self.metric == 'skewness':
-#             masked = np.ma.masked_array(mat, np.isnan(mat))
-#             self.cpu = stats.skew(masked, axis=1)
-#         elif self.metric == 'kurtosis':
-#             masked = np.ma.masked_array(mat, np.isnan(mat))
-#             self.cpu = stats.skew(masked, axis=1)
-#
-#         self.ntype = ntype
-#         self.thr = []
-#
-#     def compute(self, ds, conn, thr=None):
-#
-#         self.thr = thr
-#         self.value = []
-#         self.index = []
-#
-#         if self.thr is None:
-#             mat = conn.mat
-#         else:
-#             if self.ntype == 'binary':
-#                 mat = conn.mat >= threshold
-#               #  mat[mat == 0] = np.nan
-#             else:
-#                 mat = conn.mat*(conn.mat >= threshold)
-#                 mat[mat == 0] = np.nan
-#
-#         for i in np.unique(ds.module):
-#            i_index = np.asarray(np.nonzero(ds.module == i)).T
-#            for j in np.unique(ds.module):
-#                j_index = np.asarray(np.nonzero(ds.module == j)).T
-#                sub_mat = np.zeros((i_index.shape[0],j_index.shape[1]),dtype=float)
-#                sub_mat = mat[i_index].reshape(i_index.shape[0],-1)[:,j_index].reshape(i_index.shape[0],-1)
-#                if self.metric == 'sum':
-#                    cpu = np.nansum(sub_mat, axis=1)
-#                elif self.metric == 'std' and self.ntype == 'weighted':
-#                    cpu = np.nanstd(sub_mat, axis=1)
-#                elif self.metric == 'skewness' and self.ntype == 'weighted':
-#                    masked = np.ma.masked_array(sub_mat, np.isnan(sub_mat))
-#                    cpu = stats.skew(masked, axis=1)
-#                elif self.metric == 'kurtosis' and self.ntype == 'weighted':
-#                    masked = np.ma.masked_array(sub_mat, np.isnan(sub_mat))
-#                    cpu = stats.skew(masked, axis=1)
-#
-#                self.value.append(cpu)
-#                self.index.append([i,j])
-#
-#
-# class CPA(object):
-#     def __init__(self, ds, conn, meas):
-#         self.ds = ds
-#         self.conn = conn
-#         self.meas = meas
-#
-#     def comp_conn(self):
-#         self.conn.compute(self.ds)
-#
-#     def meas_conn(self, thr=None):
-#         self.meas.compute(self.ds, self.conn, thr)
-#
-#     def save(self, outdir):
-#         if self.ds.level == 'roi':
-#             for i in range(0, len(self.meas.value)):
-#                 index = self.meas.index[i]
-#                 np.savetxt(outdir+'/'+'roi'+'-'+str(index[0])+'to'+str(index[1]), self.meas.value[i])
-#
-#         elif self.ds.level == 'voxel':
-#             node_img = nib.load(self.ds.fnode_img)
-#             node = node_img.get_data()
-#             cell = np.zeros((node.shape[0],node.shape[1],node.shape[2]))
-#             for i in range(0, len(self.meas.value)):
-#                 index = self.meas.index[i]
-#                 cell[(node == index[0]).astype(np.bool)] = self.meas.value[i]
-#                 img = nib.Nifti1Image(cell, self.ds.affine)
-#                 img.to_filename(os.path.join(outdir,self.meas.metric+'-'+str(index[0])+'to'+str(index[1])+'.nii.gz'))
+
+class Measure(object):
+    def __init__(self, ds, conn, metric = 'sum', ntype = 'weighted'):
+
+        self.metric = metric
+        mat = conn.mat
+        mat[np.diag_indices_from(mat)] = np.nan
+
+        if self.metric == 'sum':
+            self.cpu = np.nansum(mat, axis=1)
+        elif self.metric == 'std':
+            self.cpu = np.nanstd(mat, axis=1)
+        elif self.metric == 'skewness':
+            masked = np.ma.masked_array(mat, np.isnan(mat))
+            self.cpu = stats.skew(masked, axis=1)
+        elif self.metric == 'kurtosis':
+            masked = np.ma.masked_array(mat, np.isnan(mat))
+            self.cpu = stats.skew(masked, axis=1)
+
+        self.ntype = ntype
+        self.thr = []
+
+    def compute(self, ds, conn, thr=None):
+
+        self.thr = thr
+        self.value = []
+        self.index = []
+
+        if self.thr is None:
+            mat = conn.mat
+        else:
+            if self.ntype == 'binary':
+                mat = conn.mat >= threshold
+              #  mat[mat == 0] = np.nan
+            else:
+                mat = conn.mat*(conn.mat >= threshold)
+                mat[mat == 0] = np.nan
+
+        for i in np.unique(ds.module):
+           i_index = np.asarray(np.nonzero(ds.module == i)).T
+           for j in np.unique(ds.module):
+               j_index = np.asarray(np.nonzero(ds.module == j)).T
+               sub_mat = np.zeros((i_index.shape[0],j_index.shape[1]),dtype=float)
+               sub_mat = mat[i_index].reshape(i_index.shape[0],-1)[:,j_index].reshape(i_index.shape[0],-1)
+               if self.metric == 'sum':
+                   cpu = np.nansum(sub_mat, axis=1)
+               elif self.metric == 'std' and self.ntype == 'weighted':
+                   cpu = np.nanstd(sub_mat, axis=1)
+               elif self.metric == 'skewness' and self.ntype == 'weighted':
+                   masked = np.ma.masked_array(sub_mat, np.isnan(sub_mat))
+                   cpu = stats.skew(masked, axis=1)
+               elif self.metric == 'kurtosis' and self.ntype == 'weighted':
+                   masked = np.ma.masked_array(sub_mat, np.isnan(sub_mat))
+                   cpu = stats.skew(masked, axis=1)
+
+               self.value.append(cpu)
+               self.index.append([i,j])
+
+
+class CPA(object):
+    def __init__(self, ds, conn, meas):
+        self.ds = ds
+        self.conn = conn
+        self.meas = meas
+
+    def comp_conn(self):
+        self.conn.compute(self.ds)
+
+    def meas_conn(self, thr=None):
+        self.meas.compute(self.ds, self.conn, thr)
+
+    def save(self, outdir):
+        if self.ds.level == 'roi':
+            for i in range(0, len(self.meas.value)):
+                index = self.meas.index[i]
+                np.savetxt(outdir+'/'+'roi'+'-'+str(index[0])+'to'+str(index[1]), self.meas.value[i])
+
+        elif self.ds.level == 'voxel':
+            node_img = nib.load(self.ds.fnode_img)
+            node = node_img.get_data()
+            cell = np.zeros((node.shape[0],node.shape[1],node.shape[2]))
+            for i in range(0, len(self.meas.value)):
+                index = self.meas.index[i]
+                cell[(node == index[0]).astype(np.bool)] = self.meas.value[i]
+                img = nib.Nifti1Image(cell, self.ds.affine)
+                img.to_filename(os.path.join(outdir,self.meas.metric+'-'+str(index[0])+'to'+str(index[1])+'.nii.gz'))
 
