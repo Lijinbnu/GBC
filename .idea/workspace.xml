@@ -36,13 +36,10 @@
       <file leaf-file-name="cpa.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/cpa.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="1.8413926">
-              <caret line="190" column="37" selection-start-line="190" selection-start-column="37" selection-end-line="190" selection-end-column="37" />
+            <state vertical-scroll-proportion="0.2746615">
+              <caret line="171" column="0" selection-start-line="171" selection-start-column="0" selection-end-line="171" selection-end-column="0" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
-                <marker date="1452750645000" expanded="true" signature="919:2398" placeholder="..." />
-                <marker date="1452750645000" expanded="true" signature="2647:3617" placeholder="..." />
-                <marker date="1452750645000" expanded="true" signature="2933:3617" placeholder="..." />
               </folding>
             </state>
           </provider>
@@ -419,13 +416,10 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/cpa.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="1.8413926">
-          <caret line="190" column="37" selection-start-line="190" selection-start-column="37" selection-end-line="190" selection-end-column="37" />
+        <state vertical-scroll-proportion="0.2746615">
+          <caret line="171" column="0" selection-start-line="171" selection-start-column="0" selection-end-line="171" selection-end-column="0" />
           <folding>
             <element signature="e#0#9#0" expanded="true" />
-            <marker date="1452750645000" expanded="true" signature="919:2398" placeholder="..." />
-            <marker date="1452750645000" expanded="true" signature="2647:3617" placeholder="..." />
-            <marker date="1452750645000" expanded="true" signature="2933:3617" placeholder="..." />
           </folding>
         </state>
       </provider>

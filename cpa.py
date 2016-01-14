@@ -112,10 +112,12 @@ class Connectivity(object):
         metric
         tm
 
+
         Returns
         -------
 
         """
+
         self.metric = metric
         self.tm = tm
         self.mat = []
@@ -146,7 +148,7 @@ class Connectivity(object):
             print 'wavelet metric is not implemented'
 
 class Measure(object):
-    def __init__(self, ds, conn, metric = 'sum', ntype = 'weighted'):
+    def __init__(self, ds, conn, metric='sum', ntype='weighted'):
 
         self.metric = metric
         mat = conn.mat
@@ -172,14 +174,16 @@ class Measure(object):
         self.value = []
         self.index = []
 
-        if self.thr is None:
+        if self.thr is None and (self.ntype == 'binary'):
+            raise user_defined_exception('you should set threshold for binary image!')
+        elif self.thr is None and (self.ntype == 'weighted'):
             mat = conn.mat
         else:
             if self.ntype == 'binary':
-                mat = conn.mat >= threshold
+                mat = conn.mat >= self.thr
               #  mat[mat == 0] = np.nan
             else:
-                mat = conn.mat*(conn.mat >= threshold)
+                mat = conn.mat*(conn.mat >= self.thr)
                 mat[mat == 0] = np.nan
 
         for i in np.unique(ds.module):
@@ -222,12 +226,16 @@ class CPA(object):
                 np.savetxt(outdir+'/'+'roi'+'-'+str(index[0])+'to'+str(index[1]), self.meas.value[i])
 
         elif self.ds.level == 'voxel':
-            node_img = nib.load(self.ds.fnode_img)
-            node = node_img.get_data()
-            cell = np.zeros((node.shape[0],node.shape[1],node.shape[2]))
+            if self.ds.fmodule is not None:
+                module_img = nib.load(self.ds.fmodule)
+                module = module_img.get_data()
+            else:
+                module_img = nib.load(self.ds.fnode_img)
+                module = module_img.get_data()
+            cell = np.zeros((module.shape[0],module.shape[1],module.shape[2]))
             for i in range(0, len(self.meas.value)):
                 index = self.meas.index[i]
-                cell[(node == index[0]).astype(np.bool)] = self.meas.value[i]
+                cell[(module == index[0]).astype(np.bool)] = self.meas.value[i]
                 img = nib.Nifti1Image(cell, self.ds.affine)
                 img.to_filename(os.path.join(outdir,self.meas.metric+'-'+str(index[0])+'to'+str(index[1])+'.nii.gz'))
 
