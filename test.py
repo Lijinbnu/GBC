@@ -12,16 +12,18 @@ cond_file = './data/design.mat'
 
 
 # define dataset
-ds = DataSet(targ_img_file, node_img_file,'voxel',cond_file)
+ds = DataSet(targ_img_file, node_img_file,'roi',cond_file)
 
 # define connectivity
-conn = Connectivity('pearson', True)
+conn = Connectivity('pearson')
 conn.compute(ds)
 
-#
-# # define measures
-# meas = Measure('sum')
-#
+
+# define measures
+meas = Measure('sum')
+meas.compute(conn)
+print len(meas.value)
+
 # # define cpa pipeline
 # cpa = CPA(ds,conn,meas)
 #
