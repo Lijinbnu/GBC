@@ -80,7 +80,8 @@ class DataSet(object):
         self.level = level
         # extract tc for voxel
         if self.level == 'voxel':
-            self.nid = node[node.astype(np.bool)]
+            imgdim = self.header.get_data_shape()[:3]
+            self.nid = node.reshape(np.prod(imgdim))
             self.tc = targ[node.astype(np.bool), :]
 
         # extract tc for roi
@@ -100,9 +101,10 @@ class DataSet(object):
         else:
             label_img = nib.load(flabel_img)
             label = label_img.get_data()
-            if (node_img.get_shape() == label_img.get_shape()) and (node.astype(np.bool) == label.astype(np.bool)):
+            if (node_img.get_shape() == label_img.get_shape()) and (node.astype(np.bool) == label.astype(np.bool)).all():
                 if self.level == 'voxel':
-                    self.nlabel = label[label.astype(np.bool)]
+                    imgdim = self.header.get_data_shape()[:3]
+                    self.nlabel = label.reshape(np.prod(imgdim))
                 else:
                     for i in range(0, self.nid.shape[0]):
                         self.nlabel[i] = np.mean(label[node == i])
@@ -236,10 +238,10 @@ class Measure(object):
             self.partition = partition
 
         P = np.unique(self.partition).tolist()
-        for i in P:
-            I = np.where(self.partition == i)
-            for j in P:
-                J = np.where(self.partition == j)
+        for i in P[1:]:
+            I = np.where(self.partition[self.partition.astype(np.bool)] == i)
+            for j in P[1:]:
+                J = np.where(self.partition[self.partition.astype(np.bool)] == j)
                 sub_mat = mat[np.ix_(I[0], J[0])]
                 self.value.append(self.cpu(sub_mat, axis=1))
 
@@ -260,7 +262,7 @@ class Measure(object):
         """
 
         P = np.unique(self.partition).tolist()
-        NP = len(P)
+        NP = np.count_nonzero(P)
         ds = self.conn.ds
         if ds.level == 'roi':
             # convert self.value to 2D array, every coloumn correspond a seed module
@@ -278,9 +280,9 @@ class Measure(object):
             value = np.zeros((np.prod(imgdim), NP * NP))
 
             # convert self.value to 4D array, every 3D volume correspond a seed module
-            for i in P:
+            for i in P[1:]:
                 I = (self.partition == i)
-                for j in P:
+                for j in P[1:]:
                     J = int((i - 1) * NP + (j - 1))
                     value[I, J] = self.value[J]
 
