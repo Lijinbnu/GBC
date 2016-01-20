@@ -28,7 +28,7 @@ def pearson_correlation(D, w=None):
     Parameters
     ----------
     D : A 2-D array containing multiple variables and observations.
-        Each column of `D` represents a variable, and each row a single
+        Each row of `D` represents a variable, and each column a single
         observation of all those variables.
 
     w : 1-D array of observation vector weights.
@@ -196,7 +196,7 @@ class Measure(object):
         elif self.metric == 'skewness':
             self.cpu = stats.skew
         elif self.metric == 'kurtosis':
-            self.cpu = stats.skew
+            self.cpu = stats.kurtosis
 
         self.conn = conn
         self.ntype = ntype
@@ -227,9 +227,8 @@ class Measure(object):
             mat = self.conn.mat
         else:
             mat = self.conn.mat > thr
-
-        if self.ntype == 'weighted':
-            mat = mat * self.conn.mat
+            if self.ntype == 'weighted':
+                mat = mat * self.conn.mat
 
         if partition is None:
             self.partition = self.conn.ds.nlabel
@@ -245,6 +244,7 @@ class Measure(object):
                 self.value.append(self.cpu(sub_mat, axis=1))
 
         return self
+
     def set_conn(self, conn):
         self.conn = conn
 
@@ -274,7 +274,7 @@ class Measure(object):
             np.savetxt(os.path.join(outdir, self.metric), value, fmt= '%.3f')
 
         elif ds.level == 'voxel':
-            imgdim = ds.header.get_data_shape()
+            imgdim = ds.header.get_data_shape()[:3]
             value = np.zeros((np.prod(imgdim), NP * NP))
 
             # convert self.value to 4D array, every 3D volume correspond a seed module
