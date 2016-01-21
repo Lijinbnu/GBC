@@ -97,20 +97,13 @@ class DataSet(object):
         if (len(node_img.shape) == 3) and (node_img.shape == targ_img.shape[:3]):
             node = node_img.get_data()
             # node mask
-            nmas = node != 0
+            nmas = (node != 0)
         else:
             raise UserDefinedException('Node image and target image are not match!')
 
         self.level = level
         # extract info for voxel
         if self.level == 'voxel':
-<<<<<<< HEAD
-            imgdim = self.header.get_data_shape()[:3]
-            self.nid = node.reshape(np.prod(imgdim))
-            self.tc = targ[node.astype(np.bool), :]
-
-        # extract tc for roi
-=======
             # time course
             self.tc = targ[nmas, :]
             # node id
@@ -118,7 +111,6 @@ class DataSet(object):
             # node coordinates
             self.ncoords = np.transpose(np.nonzero(node))
         # extract info for roi
->>>>>>> master
         elif self.level == 'roi':
             nid = np.unique(node)
             self.nid = nid[nid != 0]
@@ -137,17 +129,10 @@ class DataSet(object):
         else:
             label_img = load_img(flabel_img)
             label = label_img.get_data()
-<<<<<<< HEAD
-            if (node_img.get_shape() == label_img.get_shape()) and (node.astype(np.bool) == label.astype(np.bool)).all():
-                if self.level == 'voxel':
-                    imgdim = self.header.get_data_shape()[:3]
-                    self.nlabel = label.reshape(np.prod(imgdim))
-=======
-            lmas = label != 0
+            lmas = (label != 0)
             if (node_img.shape == label_img.shape) and (nmas == lmas).all():
                 if self.level == 'voxel':
                     self.nlabel = label[lmas]
->>>>>>> master
                 else:
                     self.nlabel = np.zeros((self.nid.shape[0]))
                     for i in range(self.nid.shape[0]):
@@ -296,10 +281,10 @@ class Measure(object):
             self.partition = partition
 
         P = np.unique(self.partition).tolist()
-        for i in P[1:]:
-            I = np.where(self.partition[self.partition.astype(np.bool)] == i)
-            for j in P[1:]:
-                J = np.where(self.partition[self.partition.astype(np.bool)] == j)
+        for i in P:
+            I = np.where(self.partition == i)
+            for j in P:
+                J = np.where(self.partition == j)
                 sub_mat = mat[np.ix_(I[0], J[0])]
                 self.value.append(self.cpu(sub_mat, axis=1))
 
@@ -320,12 +305,8 @@ class Measure(object):
         """
 
         P = np.unique(self.partition).tolist()
-<<<<<<< HEAD
-        NP = np.count_nonzero(P)
-=======
         NP = len(P)
         R = range(NP) # node range
->>>>>>> master
         ds = self.conn.ds
         if ds.level == 'roi':
             # convert self.value to 2D array, every coloumn correspond a seed module
@@ -343,19 +324,11 @@ class Measure(object):
             value = np.zeros((dim[0], dim[1], dim[2], NP * NP))
 
             # convert self.value to 4D array, every 3D volume correspond a seed module
-<<<<<<< HEAD
-            for i in P[1:]:
-                I = (self.partition == i)
-                for j in P[1:]:
-                    J = int((i - 1) * NP + (j - 1))
-                    value[I, J] = self.value[J]
-=======
             for i in R:
                 I = ds.ncoords[self.partition == P[i], :]
                 for j in R:
                     J = int(i * NP + j)
                     value[I[:, 0], I[:, 1], I[:, 2], J] = self.value[J]
->>>>>>> master
 
             # save voxel-wise inter-module measure in 4D volume
             header = ds.header
@@ -415,9 +388,8 @@ class LocalMeasure(object):
             mat = self.conn.mat
         else:
             mat = self.conn.mat > thr
-
-        if self.ntype == 'weighted':
-            mat = mat * self.conn.mat
+            if self.ntype == 'weighted':
+                mat = mat * self.conn.mat
 
         self.radius = radius
         # compute local neighbor for each node

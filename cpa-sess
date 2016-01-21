@@ -1,14 +1,14 @@
 #! /usr/bin/env python
 
-
 import os
 import argparse
 import nipype.interfaces.io as nio
 #import nipype.interfaces.fsl as fsl
 import nipype.interfaces.utility as util
 import nipype.pipeline.engine as pe
+import nibabel as nib
 #import time
-
+from time import time
 
 def subjrlf(subject_id, data_dir, fsd, fstem, output_dir):
     
@@ -37,11 +37,11 @@ def subjrlf(subject_id, data_dir, fsd, fstem, output_dir):
     #return path
 
 
-def CPA(targ, node, label, outdir, modu=None):
-    
+def CPA(targ, node, label, outdir, level):
+
     from cpa import *
 
-    ds = DataSet(targ, node,'voxel', label)
+    ds = DataSet(targ, node, label, level=level)
     conn = Connectivity(ds, 'pearson').compute()
     meas = Measure(conn, 'sum').compute()
     meas.save(outdir)
@@ -96,6 +96,10 @@ def main():
     parser.add_argument('-labelf',
                         help='Node label file',
                         dest='labelf')
+    parser.add_argument('-level',
+                        help='voxel/roi level',
+                        dest='level',
+                        default='voxel')
     parser.add_argument('-outputdirf',
                         help='Output directory file',
                         dest='output_dirf',
@@ -147,14 +151,17 @@ def main():
     fsd = args.fsd
     #rlf = args.rlf
     fstem = args.fstem
+    level = args.level
 
     nodef = args.nodef
     nodef = open(nodef)
     node = nodef.readline().strip()
+    node = nib.load(node)
 
     labelf = args.labelf
     labelf = open(labelf)
     label = labelf.readline().strip()
+    label = nib.load(label)
 
     output_dirf = args.output_dirf
     output_dirf = open(output_dirf)
@@ -175,9 +182,10 @@ def main():
                                             outdir='results/%s')
     datasource.inputs.sort_filelist = False
     
-    pcanode = pe.Node(interface=util.Function(input_names=['targ','node','label','outdir'],output_names=['out_files'],function=CPA),name='cpanode')
+    pcanode = pe.Node(interface=util.Function(input_names=['targ','node','label','level','outdir'],output_names=['out_files'],function=CPA),name='cpanode')
     pcanode.inputs.node = node
     pcanode.inputs.label = label
+    pcanode.inputs.level = level
     
     pca.base_dir = os.path.abspath(targetdir)
     pca.connect([
@@ -190,8 +198,11 @@ def main():
 
 
 if __name__ == '__main__':
+    t0 = time()
     main()
+    t1 = time()
 
+    print "elapsed time is %f" %(t1-t0)
 
 
 
