@@ -1,24 +1,32 @@
 # emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 
-import scipy
+
 import numpy as np
-from math import pi
-import nibabel as nib
-import scipy.ndimage as ndimagei
-from scipy import sparse
+
+def in2d(A, B):
+    """
+    Find whether the row of A is in B
+
+    Parameters
+    ----------
+    A,B: numpy 2d array
+
+    Returns
+    -------
+    C: 1d array
+    A boolean array with the same length as A that is true where an element of A is in B and False otherwise
+    """
+    nrows, ncols = A.shape
+    dtype = {'names': ['f{}'.format(i) for i in range(ncols)], 'formats': ncols * [A.dtype]}
+    C = np.in1d(np.ascontiguousarray(A).view(dtype), np.ascontiguousarray(B).view(dtype))
+    return C
+
+
 conn_dict = {6:1, 18:2, 26:3}
 
 def is_in_image(v, shape):
-    """
-    
-    Contributions
-    -------------
-        Author: 
-        Editor: 
-    
-    """
-    
+
     if np.rank(v) == 1:
         return ((v[0] >= 0) & (v[0] < shape[0]) &
                 (v[1] >= 0) & (v[1] < shape[1]) &
@@ -34,11 +42,7 @@ class neighbor:
     Return
     ------
         offsets: 2xN or 3xN np array
-    
-    Contributions
-    -------------
-        Author: 
-        Editor: 
+
     
     """
     def __init__(self, nbdim, nbsize, res=[1,1,1]):
@@ -56,11 +60,7 @@ class pixelconn(neighbor):
     -------
         offsets: 2 x N or 3 x N np array, 
                 N = nbdim + 1(current pixel is included)
-    
-    Contributions
-    -------------
-        Author: 
-        Editor: 
+
     
     """
 
@@ -113,11 +113,6 @@ class pixelconn(neighbor):
 class sphere(neighbor):
     """Sphere neighbor for pixel or voxel.
     
-    Contributions
-    -------------
-        Author: 
-        Editor: 
-    
     """
     
     def compute_offsets(self):
@@ -138,18 +133,13 @@ class sphere(neighbor):
                     for z in np.arange(-nbsizez, nbsizez + 1):
                         if np.linalg.norm([x*self.res[0],y*self.res[1],z*self.res[2]]) <= self.nbsize:
                             offsets.append([x,y,z])
-        else: print 'wrong nbdim'
+        else:
+            print 'wrong nbdim'
 
         return np.array(offsets).T
      
 class cube(neighbor):
     """
-    
-    Contributions
-    -------------
-        Author: 
-        Editor: 
-    
     """
     
     def compute_offsets(self):
@@ -216,3 +206,4 @@ class  reho_volneighbors(pixelconn):
             volnb.append([self.imgidx1d[v], nb1d[masnb]])
 
         return volnb
+
