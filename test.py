@@ -13,13 +13,16 @@ cond_file = './data/design.mat'
 
 
 # define dataset
-ds = DataSet(targ_img_file, node_img_file, 'roi')
+ds = DataSet(ftarg_img = targ_img_file, fnode_img = node_img_file, flabel_img=node_img_file, level='voxel')
 
 # define and compute connectivity
 conn = Connectivity(ds, 'pearson').compute()
 
-# define and compute measures
-meas = Measure(conn, 'sum').compute()
+# define and compute local measures
+glob_meas = Measure(conn, 'sum').compute()
+glob_meas.save()
 
-# outdir = ''
-meas.save()
+
+# define and compute locall measures
+local_meas = LocalMeasure(conn, 'sum').compute(radius=9)
+local_meas.save()

@@ -3,6 +3,7 @@ import os
 import nibabel as nib
 import numpy as np
 from scipy import stats
+import neighbor as nb
 
 
 class UserDefinedException(Exception):
@@ -20,7 +21,6 @@ class UserDefinedException(Exception):
         """
         Exception.__init__(self)
         self._str = str
-
 
 def pearson_correlation(D, w=None):
     """
@@ -49,65 +49,109 @@ def pearson_correlation(D, w=None):
     return R
 
 
+def load_img(fimg):
+    """
+
+    Parameters
+    ----------
+    fimg : a file or a NiftiImage object
+
+    Returns
+    -------
+    img : a NiftiImage object
+    """
+    if isinstance(fimg,nib.Nifti1Image):
+        img = fimg
+    elif os.path.isfile(fimg):
+        # load node image
+        img = nib.load(fimg)
+    else:
+        raise UserDefinedException('Wrong Image!')
+
+    return img
+
+
 class DataSet(object):
-    def __init__(self, ftarg_img, fnode_img, level='voxel', flabel_img=None, cond_file=None):
+    def __init__(self, ftarg_img, fnode_img, flabel_img=None, cond_file=None, level='voxel'):
         """
 
         Parameters
         ----------
-        ftarg_img : target image file, str
-        fnode_img : node image file, str
-        flabel_img : label image file for node
+        ftarg_img : target image file(str) or a NifitiImage object
+        fnode_img : node image file(str) or a NifitiImage object
+        flabel_img : label image file(str) or a NifitiImage object
         cond_file : condition file, str
         level : level of interest, str, voxel or roi
 
         """
         # load target image
-        targ_img = nib.load(ftarg_img)
-        if len(targ_img.get_shape()) == 4:
+        targ_img = load_img(ftarg_img)
+        if len(targ_img.shape) == 4:
             targ = targ_img.get_data()
             self.header = targ_img.header
         else:
             raise UserDefinedException('target image is not a 4D Nifti volume!')
 
         # load node image
-        node_img = nib.load(fnode_img)
-        if (len(node_img.get_shape()) == 3) and (node_img.get_shape() == targ_img.get_shape()[:3]):
+        node_img = load_img(fnode_img)
+        if (len(node_img.shape) == 3) and (node_img.shape == targ_img.shape[:3]):
             node = node_img.get_data()
+            # node mask
+            nmas = node != 0
         else:
             raise UserDefinedException('Node image and target image are not match!')
 
         self.level = level
-        # extract tc for voxel
+        # extract info for voxel
         if self.level == 'voxel':
+<<<<<<< HEAD
             imgdim = self.header.get_data_shape()[:3]
             self.nid = node.reshape(np.prod(imgdim))
             self.tc = targ[node.astype(np.bool), :]
 
         # extract tc for roi
+=======
+            # time course
+            self.tc = targ[nmas, :]
+            # node id
+            self.nid = node[nmas]
+            # node coordinates
+            self.ncoords = np.transpose(np.nonzero(node))
+        # extract info for roi
+>>>>>>> master
         elif self.level == 'roi':
             nid = np.unique(node)
-            self.nid = nid[1:]
+            self.nid = nid[nid != 0]
             tc = np.zeros((self.nid.shape[0], targ.shape[3]))
-            for i in range(0, self.nid.shape[0]):
-                tc[i, :] = np.mean(targ[node == i, :], axis=0)
+            for i in range(self.nid.shape[0]):
+                tc[i, :] = np.nanmean(targ[node == self.nid[i], :], axis=0)
             self.tc = tc
+            self.ncoords = []
         else:
             self.tc = []
             raise UserDefinedException('Wrong level! it should be voxel or roi.')
 
+        # prep label info
         if flabel_img is None:
             self.nlabel = np.ones(self.nid.shape[0])
         else:
-            label_img = nib.load(flabel_img)
+            label_img = load_img(flabel_img)
             label = label_img.get_data()
+<<<<<<< HEAD
             if (node_img.get_shape() == label_img.get_shape()) and (node.astype(np.bool) == label.astype(np.bool)).all():
                 if self.level == 'voxel':
                     imgdim = self.header.get_data_shape()[:3]
                     self.nlabel = label.reshape(np.prod(imgdim))
+=======
+            lmas = label != 0
+            if (node_img.shape == label_img.shape) and (nmas == lmas).all():
+                if self.level == 'voxel':
+                    self.nlabel = label[lmas]
+>>>>>>> master
                 else:
-                    for i in range(0, self.nid.shape[0]):
-                        self.nlabel[i] = np.mean(label[node == i])
+                    self.nlabel = np.zeros((self.nid.shape[0]))
+                    for i in range(self.nid.shape[0]):
+                        self.nlabel[i] = np.mean(label[node == self.nid[i]])
             else:
                 raise UserDefinedException('Label image and Node image are not match!')
 
@@ -117,6 +161,20 @@ class DataSet(object):
         else:
             cond = np.loadtxt(cond_file, skiprows=5)
             self.cond = cond[:, np.arange(0, cond.shape[1] - 6, 2)]
+
+        #  inti variables that will be assigned in other palace
+        self.nnb = []
+
+    def compute_nb(self,radius):
+        sph = nb.sphere(3, radius, self.header.get_zooms()).compute_offsets().T
+        for v in range(0,self.nid.shape[0]):
+            idx = nb.in2d(self.ncoords, self.ncoords[v,:] + sph)
+            self.nnb.append(np.nonzero(idx)[0])
+
+        return self.nnb
+
+    def set_label(self,label):
+        self.nlabel = label
 
     def set_tc(self, tc):
         self.tc = tc
@@ -262,34 +320,139 @@ class Measure(object):
         """
 
         P = np.unique(self.partition).tolist()
+<<<<<<< HEAD
         NP = np.count_nonzero(P)
+=======
+        NP = len(P)
+        R = range(NP) # node range
+>>>>>>> master
         ds = self.conn.ds
         if ds.level == 'roi':
             # convert self.value to 2D array, every coloumn correspond a seed module
             value = np.zeros((ds.nid.shape[0], NP * NP))
-            for i in P:
-                I = (self.partition == i)
-                for j in P:
-                    J = int((i - 1) * NP + (j - 1))
+            for i in R:
+                I = (self.partition == P[i])
+                for j in R:
+                    J = int(i * NP + j)
                     value[I, J] = self.value[J]
 
             np.savetxt(os.path.join(outdir, self.metric), value, fmt= '%.3f')
 
         elif ds.level == 'voxel':
-            imgdim = ds.header.get_data_shape()[:3]
-            value = np.zeros((np.prod(imgdim), NP * NP))
+            dim = ds.header.get_data_shape()[:3]
+            value = np.zeros((dim[0], dim[1], dim[2], NP * NP))
 
             # convert self.value to 4D array, every 3D volume correspond a seed module
+<<<<<<< HEAD
             for i in P[1:]:
                 I = (self.partition == i)
                 for j in P[1:]:
                     J = int((i - 1) * NP + (j - 1))
                     value[I, J] = self.value[J]
+=======
+            for i in R:
+                I = ds.ncoords[self.partition == P[i], :]
+                for j in R:
+                    J = int(i * NP + j)
+                    value[I[:, 0], I[:, 1], I[:, 2], J] = self.value[J]
+>>>>>>> master
 
             # save voxel-wise inter-module measure in 4D volume
-            value = np.reshape(value, (imgdim[0], imgdim[1], imgdim[2], NP * NP))
             header = ds.header
             header['cal_max'] = value.max()
             header['cal_min'] = value.min()
             img = nib.Nifti1Image(value, None, header)
-            nib.save(img, os.path.join(outdir, self.metric + '.nii.gz'))
+            nib.save(img, os.path.join(outdir, self.metric + '_global.nii.gz'))
+
+
+class LocalMeasure(object):
+    def __init__(self, conn, radius, metric='sum', ntype='weighted'):
+        """
+
+        Parameters
+        ----------
+        metric: metric to measure the connectivity pattern,str
+        thr: threshold, scalar
+        ntype: network type, str
+
+        """
+        self.metric = metric
+        if self.metric == 'sum':
+            self.cpu = np.nansum
+        elif self.metric == 'std':
+            self.cpu = np.nanstd
+        elif self.metric == 'skewness':
+            self.cpu = stats.skew
+        elif self.metric == 'kurtosis':
+            self.cpu = stats.kurtosis
+
+        self.conn = conn
+        self.ntype = ntype
+        self.thr = []
+        self.value = []
+        self.radius = []
+
+    def compute(self, thr=None, radius=6):
+        """
+
+        Parameters
+        ----------
+        thr : threshod to remove non-interest edge, scalar
+        radius: radius for local neighbor(sphere), scalar,unit is mm
+
+
+        Returns
+        -------
+        self : A LocalMeasure object
+
+        """
+
+        self.thr = thr
+        if self.thr is None and (self.ntype == 'binary'):
+            raise UserDefinedException('Thr is necessary for binary network!')
+
+        if self.thr is None:
+            mat = self.conn.mat
+        else:
+            mat = self.conn.mat > thr
+
+        if self.ntype == 'weighted':
+            mat = mat * self.conn.mat
+
+        self.radius = radius
+        # compute local neighbor for each node
+        nnb = self.conn.ds.compute_nb(self.radius)
+
+        self.value = np.zeros(mat.shape[0])
+        for i in range(mat.shape[0]):
+            self.value[i] = self.cpu(mat[i, nnb[i]])
+
+        return self
+
+    def set_conn(self, conn):
+        self.conn = conn
+
+    def save(self, outdir='.'):
+        """
+
+        Parameters
+        ----------
+        ds : DataSet object which the measure was based on
+        outdir : dir to save the measures
+
+
+        """
+
+        ds = self.conn.ds
+        # convert self.value to 3D array
+        dim = ds.header.get_data_shape()
+        value = np.zeros((dim[0], dim[1], dim[2]))
+
+        value[ds.ncoords[:,0], ds.ncoords[:,1], ds.ncoords[:,2]] = self.value
+
+        # save voxel-wise inter-module measure in 4D volume
+        header = ds.header
+        header['cal_max'] = value.max()
+        header['cal_min'] = value.min()
+        img = nib.Nifti1Image(value, None, header)
+        nib.save(img, os.path.join(outdir, self.metric + '_local.nii.gz'))
