@@ -18,11 +18,16 @@ ds = DataSet(ftarg_img = targ_img_file, fnode_img = node_img_file, flabel_img=no
 # define and compute connectivity
 conn = Connectivity(ds, metric='pearson').compute()
 
+# define and compute global measures
+# glob_meas = Measure(conn, metric='sum').compute()
+# glob_meas.save()
+
+
 # define and compute local measures
-glob_meas = Measure(conn, metric='sum').compute()
-glob_meas.save()
+# local_meas = LocalMeasure(conn, radius=6, metric='sum').compute()
+# local_meas.save()
 
 
-# define and compute locall measures
-local_meas = LocalMeasure(conn, radius=6, metric='sum').compute()
-local_meas.save()
+# define and compute spatial measures
+spat_meas = SpatialMeasure(conn).compute()
+spat_meas.save()

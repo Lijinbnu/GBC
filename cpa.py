@@ -1,9 +1,10 @@
 import os
-
 import nibabel as nib
 import numpy as np
 from scipy import stats
 import neighbor as nb
+from scipy.spatial import  distance
+
 
 
 class UserDefinedException(Exception):
@@ -271,6 +272,7 @@ class Measure(object):
 
         self.conn = conn
         self.ntype = ntype
+        self.mtype = 'global' # measure type
 
         # these variables will be assigned in self.compute()
         self.partition = []
@@ -365,7 +367,7 @@ class Measure(object):
             header['cal_max'] = value.max()
             header['cal_min'] = value.min()
             img = nib.Nifti1Image(value, None, header)
-            nib.save(img, os.path.join(outdir, '_'.join((self.ntype, 'global', self.metric)) + '.nii.gz'))
+            nib.save(img, os.path.join(outdir, '_'.join((self.ntype, self.mtype, self.metric)) + '.nii.gz'))
 
 
 class LocalMeasure(object):
@@ -392,6 +394,7 @@ class LocalMeasure(object):
         self.conn = conn
         self.ntype = ntype
         self.radius = radius
+        self.mtype = 'local'  # measure type
 
         # Variables will be assigned in self.compute()
         self.thr = []
@@ -461,4 +464,72 @@ class LocalMeasure(object):
         header['cal_max'] = value.max()
         header['cal_min'] = value.min()
         img = nib.Nifti1Image(value, None, header)
-        nib.save(img, os.path.join(outdir, '_'.join((self.ntype, 'local', self.metric)) + '.nii.gz'))
+        nib.save(img, os.path.join(outdir, '_'.join((self.ntype, self.mtype, self.metric)) + '.nii.gz'))
+
+
+class SpatialMeasure(Measure):
+    def __init__(self, conn, metric='sum', ntype='weighted'):
+        """
+
+        Parameters
+        ----------
+        metric: metric to measure the connectivity pattern,str
+        thr: threshold, scalar
+        ntype: network type, str
+        radius: radius for local neighbor(sphere), scalar,unit is mm
+        """
+
+        super(SpatialMeasure, self).__init__(conn, metric, ntype)
+
+        self.mtype = 'spatial'
+
+
+    def compute(self, thr=None, partition=None):
+        """
+
+        Parameters
+        ----------
+        thr : threshod for conn to remove non-interest edge, scalar
+        partition : node partition, 1-D array
+
+
+        Returns
+        -------
+        self : A LocalMeasure object
+
+        """
+
+        if thr is None:
+            self.thr = 0
+        else:
+            self.thr = thr
+
+        # thresholding the funcitonal connectivity mat
+        mat = self.conn.mat < self.thr
+
+        # compute the spatial distance mat
+        ncoords = self.conn.ds.ncoords
+        dist = distance.pdist(ncoords, 'euclidean')
+        dist = distance.squareform(dist)
+        dist[mat] = np.NaN
+
+        if partition is None:
+            self.partition = self.conn.ds.nlabel
+        else:
+            self.partition = partition
+
+        # compute spatial distance between and across modules
+        P = np.unique(self.partition).tolist()
+        for i in P:
+            I = np.where(self.partition == i)
+            for j in P:
+                J = np.where(self.partition == j)
+                sub_mat = dist[np.ix_(I[0], J[0])]
+                self.value.append(self.cpu(sub_mat, axis=1))
+
+        return self
+
+
+
+    def set_conn(self, conn):
+        self.conn = conn
