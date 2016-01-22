@@ -1,0 +1,209 @@
+#! /usr/bin/env python
+
+import os
+import argparse
+import nipype.interfaces.io as nio
+#import nipype.interfaces.fsl as fsl
+import nipype.interfaces.utility as util
+import nipype.pipeline.engine as pe
+import nibabel as nib
+#import time
+from time import time
+
+def subjrlf(subject_id, data_dir, fsd, fstem, output_dir):
+    
+    import os
+
+    path = os.path.join(output_dir,subject_id)
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    #frlf = open(os.path.join(data_dir,subject_id,fsd))
+    #run_list = [line.strip() for line in frlf]
+    info = dict(targ=[[subject_id, fsd, fstem]],
+                outdir=[[subject_id]],)
+
+    return info
+
+#def subjmdir(subject_id, output_dir):
+
+ #   import os
+  #  outdir = 'PcaResult'
+   # path = os.path.join(output_dir,subject_id,outdir)
+    
+    
+   # os.makedirs(path)
+
+    #return path
+
+
+def CPA(targ, node, label, outdir, level):
+
+    from cpa import *
+
+    ds = DataSet(targ, node, label, level=level)
+    conn = Connectivity(ds, 'pearson').compute()
+    meas = Measure(conn, 'sum').compute()
+    meas.save(outdir)
+
+    return 
+
+
+
+
+def main():
+    
+    parser = argparse.ArgumentParser(prog='cpa-sess',
+                                     prefix_chars='-',
+                                     description='Do connectivity pattern analysis.')
+    group1 = parser.add_mutually_exclusive_group(required=True)
+    group1.add_argument('-datadir',
+                        help='Source directory contains data file',
+                        metavar='datadir',
+                        dest='datadir')
+    group1.add_argument('-datadirf',
+                        help='File contains the source data directory',
+                        metavar='datadir-file',
+                        dest='datadirf')
+    group2 = parser.add_mutually_exclusive_group(required=True)
+    group2.add_argument('-sess',
+                        help='Input the sessid',
+                        metavar='sessid',
+                        dest='sess')
+    group2.add_argument('-sessf',
+                        help='Input the sessid file',
+                        metavar='sessid-file',
+                        dest='sessf')
+    parser.add_argument('-fsd',
+                        help='Functional sub directory, e.g. bold',
+                        dest='fsd',
+                        metavar='func-subdir',
+                        required=True)
+    #parser.add_argument('-rlf',
+    #                    help='Run list file',
+    #                    dest='rlf',
+    #                    metavar='rlf',
+    #                   required=True)
+    parser.add_argument('-fstem',
+                        help='The file name(suffix) of the functional image',
+                        dest='fstem',
+                        metavar='func-file',
+                        required=True)
+    parser.add_argument('-nodef',
+                        help='Seed node file',
+                        dest='nodef',
+                        required=True)
+    parser.add_argument('-labelf',
+                        help='Node label file',
+                        dest='labelf')
+    parser.add_argument('-level',
+                        help='voxel/roi level',
+                        dest='level',
+                        default='voxel')
+    parser.add_argument('-outputdirf',
+                        help='Output directory file',
+                        dest='output_dirf',
+                        metavar='outputdirf',
+                        required=True)
+    parser.add_argument('-plugin',
+                        help='The name of the plugin, the available plugins '
+                        'allow local and distributed execution of '
+                        'workflows, default is IPython',
+                        dest='plugin',
+                        default = 'IPython',
+                        choices=['Linear','Multiproc','IPython'])
+    parser.add_argument('-debug',
+                        help='Debug mode, save mediate results in present dir',
+                        dest='debug',
+                        default = False,
+                        action='store_true')
+    parser.add_argument('-v','--version',
+                        action='version',
+                        version='%(prog)s 0.1')
+
+    args = parser.parse_args()
+    
+    # Parallel computation exec config
+    pluginName = args.plugin
+
+    # Specify the location of the data
+    fsessid = args.sessf
+    sessid = args.sess
+    if fsessid:
+        fsessid = open(fsessid)
+        subject_list = [line.strip() for line in fsessid]
+    elif sessid:
+        subject_list = [sessid]
+
+    datadir = args.datadir
+    datadirf = args.datadirf
+    if datadir:
+        data_dir = open(datadirf)
+    elif datadirf:
+        datadirf = open(datadirf)
+        data_dir = datadirf.readline().strip()
+
+    if args.debug:
+        targetdir = './'
+    elif not args.debug:
+        targetdir = ''
+             
+    fsd = args.fsd
+    #rlf = args.rlf
+    fstem = args.fstem
+    level = args.level
+
+    nodef = args.nodef
+    nodef = open(nodef)
+    node = nodef.readline().strip()
+    node = nib.load(node)
+
+    labelf = args.labelf
+    labelf = open(labelf)
+    label = labelf.readline().strip()
+    label = nib.load(label)
+
+    output_dirf = args.output_dirf
+    output_dirf = open(output_dirf)
+    output_dir = output_dirf.readline().strip()
+
+# set up complete workflow
+
+    pca = pe.Workflow(name='pca')
+    
+    infosource = pe.Node(interface=util.IdentityInterface(fields=['subject_id']),name='infosource')
+    
+    infosource.iterables = ('subject_id', subject_list)
+
+    datasource = pe.Node(interface=nio.DataGrabber(infields=['subject_id'],outfields=['targ','outdir']),name='datasource')
+    datasource.inputs.base_directory = data_dir
+    datasource.inputs.template = '*'
+    datasource.inputs.field_template = dict(targ='%s/%s/%s.nii.gz',
+                                            outdir='results/%s')
+    datasource.inputs.sort_filelist = False
+    
+    pcanode = pe.Node(interface=util.Function(input_names=['targ','node','label','level','outdir'],output_names=['out_files'],function=CPA),name='cpanode')
+    pcanode.inputs.node = node
+    pcanode.inputs.label = label
+    pcanode.inputs.level = level
+    
+    pca.base_dir = os.path.abspath(targetdir)
+    pca.connect([
+        (infosource, datasource, [('subject_id','subject_id'),(('subject_id',subjrlf,data_dir,fsd,fstem,output_dir),'template_args')]),
+        (datasource, pcanode, [('targ','targ'),('outdir','outdir')]),
+        ])
+    pca.run(plugin=pluginName)
+
+
+
+
+if __name__ == '__main__':
+    t0 = time()
+    main()
+    t1 = time()
+
+    print "elapsed time is %f" %(t1-t0)
+
+
+
+
