@@ -22,6 +22,7 @@ class UserDefinedException(Exception):
         Exception.__init__(self)
         self._str = str
 
+
 def pearson_correlation(D, w=None):
     """
 
@@ -39,8 +40,11 @@ def pearson_correlation(D, w=None):
 
 
     """
+    # unweighted correlation
     if w is None:
         R = np.corrcoef(D)
+
+        # weighted correlation
     else:
         c = np.cov(D, aweights=w)
         d = np.diag(c)
@@ -51,19 +55,21 @@ def pearson_correlation(D, w=None):
 
 def load_img(fimg):
     """
+    Load Nifti1Image
 
     Parameters
     ----------
-    fimg : a file or a NiftiImage object
+    fimg : a file or a Nifti1Image object
 
     Returns
     -------
-    img : a NiftiImage object
+    img : a Nifti1Image object
     """
-    if isinstance(fimg,nib.Nifti1Image):
+    if isinstance(fimg, nib.Nifti1Image):
         img = fimg
+
+    # load nifti image with nibabel
     elif os.path.isfile(fimg):
-        # load node image
         img = nib.load(fimg)
     else:
         raise UserDefinedException('Wrong Image!')
@@ -96,12 +102,14 @@ class DataSet(object):
         node_img = load_img(fnode_img)
         if (len(node_img.shape) == 3) and (node_img.shape == targ_img.shape[:3]):
             node = node_img.get_data()
+
             # node mask
             nmas = node != 0
         else:
             raise UserDefinedException('Node image and target image are not match!')
 
         self.level = level
+
         # extract info for voxel
         if self.level == 'voxel':
             # time course
@@ -110,6 +118,7 @@ class DataSet(object):
             self.nid = node[nmas]
             # node coordinates
             self.ncoords = np.transpose(np.nonzero(node))
+
         # extract info for roi
         elif self.level == 'roi':
             nid = np.unique(node)
@@ -119,6 +128,7 @@ class DataSet(object):
                 tc[i, :] = np.nanmean(targ[node == self.nid[i], :], axis=0)
             self.tc = tc
             self.ncoords = []
+
         else:
             self.tc = []
             raise UserDefinedException('Wrong level! it should be voxel or roi.')
@@ -126,39 +136,47 @@ class DataSet(object):
         # prep label info
         if flabel_img is None:
             self.nlabel = np.ones(self.nid.shape[0])
+
         else:
             label_img = load_img(flabel_img)
             label = label_img.get_data()
             lmas = label != 0
+
+            # compute label for each node
             if (node_img.shape == label_img.shape) and (nmas == lmas).all():
                 if self.level == 'voxel':
                     self.nlabel = label[lmas]
+
                 else:
                     self.nlabel = np.zeros((self.nid.shape[0]))
+                    # compute ROI label as its mean
                     for i in range(self.nid.shape[0]):
                         self.nlabel[i] = np.mean(label[node == self.nid[i]])
+
             else:
                 raise UserDefinedException('Label image and Node image are not match!')
 
         # Read design matrix from design file
         if cond_file is None:
             self.cond = None
+
+        # load design info from cond file
         else:
             cond = np.loadtxt(cond_file, skiprows=5)
             self.cond = cond[:, np.arange(0, cond.shape[1] - 6, 2)]
 
-        #  inti variables that will be assigned in other palace
+        # node neighbor(nnb) will be assigned in self.compute_nb()
         self.nnb = []
 
-    def compute_nb(self,radius):
+    def compute_nb(self, radius):
         sph = nb.sphere(3, radius, self.header.get_zooms()).compute_offsets().T
-        for v in range(0,self.nid.shape[0]):
-            idx = nb.in2d(self.ncoords, self.ncoords[v,:] + sph)
+        for v in range(0, self.nid.shape[0]):
+            idx = nb.in2d(self.ncoords, self.ncoords[v, :] + sph)
             self.nnb.append(np.nonzero(idx)[0])
 
         return self.nnb
 
-    def set_label(self,label):
+    def set_label(self, label):
         self.nlabel = label
 
     def set_tc(self, tc):
@@ -186,6 +204,7 @@ class Connectivity(object):
         self.metric = metric
         self.tm = tm
         self.ds = ds
+        # mat will be assigned in self.compute()
         self.mat = []
 
     def compute(self):
@@ -197,26 +216,30 @@ class Connectivity(object):
 
         Returns
         -------
-        self : A connecivity object
+        self : A Connectivity object
 
         """
         ds = self.ds
         if self.metric == 'pearson':
             if not self.tm:
                 self.mat = pearson_correlation(ds.tc)
+
             else:
                 self.mat = np.zeros((ds.tc.shape[0], ds.tc.shape[0], ds.cond.shape[1]))
+
                 # standardize  weights to [0,1]
                 W = ds.cond
                 wmax, wmin = W.max(), W.min()
                 W = (W - wmin) / (wmax - wmin)
-                for c in range(0, W.shape[1]):
+
+                # compute connectivity matrix for each condition
+                for c in range(W.shape[1]):
                     self.mat[:, :, c] = pearson_correlation(ds.tc, W[:, c])
 
         elif self.metric == 'wavelet':
-            print 'Wavelet metric does not work now, which is not implemented.'
+            print 'Wavelet metric does not work now.'
 
-        return  self
+        return self
 
     def set_ds(self, ds):
         self.ds = ds
@@ -236,15 +259,20 @@ class Measure(object):
         self.metric = metric
         if self.metric == 'sum':
             self.cpu = np.nansum
+
         elif self.metric == 'std':
             self.cpu = np.nanstd
+
         elif self.metric == 'skewness':
             self.cpu = stats.skew
+
         elif self.metric == 'kurtosis':
             self.cpu = stats.kurtosis
 
         self.conn = conn
         self.ntype = ntype
+
+        # these variables will be assigned in self.compute()
         self.partition = []
         self.thr = []
         self.value = []
@@ -268,6 +296,7 @@ class Measure(object):
         if self.thr is None and (self.ntype == 'binary'):
             raise UserDefinedException('Thr is necessary for binary network!')
 
+        # thresholding the connectivity matrix
         if self.thr is None:
             mat = self.conn.mat
         else:
@@ -280,6 +309,7 @@ class Measure(object):
         else:
             self.partition = partition
 
+        # compute connectivity between and across modules
         P = np.unique(self.partition).tolist()
         for i in P:
             I = np.where(self.partition == i)
@@ -304,12 +334,12 @@ class Measure(object):
 
         """
 
-        P = np.unique(self.partition).tolist()
-        NP = len(P)
-        R = range(NP) # node range
+        P = np.unique(self.partition).tolist() # node partition
+        NP = len(P)    # number of node
+        R = range(NP)  # node range
         ds = self.conn.ds
         if ds.level == 'roi':
-            # convert self.value to 2D array, every coloumn correspond a seed module
+            # convert self.value to 2D array, each column corresponds a seed module
             value = np.zeros((ds.nid.shape[0], NP * NP))
             for i in R:
                 I = (self.partition == P[i])
@@ -317,29 +347,29 @@ class Measure(object):
                     J = int(i * NP + j)
                     value[I, J] = self.value[J]
 
-            np.savetxt(os.path.join(outdir, self.metric), value, fmt= '%.3f')
+            np.savetxt(os.path.join(outdir, '_'.join((self.ntype, 'global', self.metric)) + '.cpa'), value, fmt='%.3f')
 
         elif ds.level == 'voxel':
             dim = ds.header.get_data_shape()[:3]
             value = np.zeros((dim[0], dim[1], dim[2], NP * NP))
 
-            # convert self.value to 4D array, every 3D volume correspond a seed module
+            # convert self.value to 4D volume, each 3D volume corresponds a seed module
             for i in R:
                 I = ds.ncoords[self.partition == P[i], :]
                 for j in R:
                     J = int(i * NP + j)
                     value[I[:, 0], I[:, 1], I[:, 2], J] = self.value[J]
 
-            # save voxel-wise inter-module measure in 4D volume
+            # save voxelwise inter-module measure in 4D volume
             header = ds.header
             header['cal_max'] = value.max()
             header['cal_min'] = value.min()
             img = nib.Nifti1Image(value, None, header)
-            nib.save(img, os.path.join(outdir, self.metric + '_global.nii.gz'))
+            nib.save(img, os.path.join(outdir, '_'.join((self.ntype, 'global', self.metric)) + '.nii.gz'))
 
 
 class LocalMeasure(object):
-    def __init__(self, conn, radius, metric='sum', ntype='weighted'):
+    def __init__(self, conn, radius=6, metric='sum', ntype='weighted'):
         """
 
         Parameters
@@ -347,7 +377,7 @@ class LocalMeasure(object):
         metric: metric to measure the connectivity pattern,str
         thr: threshold, scalar
         ntype: network type, str
-
+        radius: radius for local neighbor(sphere), scalar,unit is mm
         """
         self.metric = metric
         if self.metric == 'sum':
@@ -361,11 +391,14 @@ class LocalMeasure(object):
 
         self.conn = conn
         self.ntype = ntype
+        self.radius = radius
+
+        # Variables will be assigned in self.compute()
         self.thr = []
         self.value = []
-        self.radius = []
 
-    def compute(self, thr=None, radius=6):
+
+    def compute(self, thr=None):
         """
 
         Parameters
@@ -384,6 +417,7 @@ class LocalMeasure(object):
         if self.thr is None and (self.ntype == 'binary'):
             raise UserDefinedException('Thr is necessary for binary network!')
 
+        # thresholding the connectivity mat
         if self.thr is None:
             mat = self.conn.mat
         else:
@@ -392,10 +426,10 @@ class LocalMeasure(object):
         if self.ntype == 'weighted':
             mat = mat * self.conn.mat
 
-        self.radius = radius
         # compute local neighbor for each node
         nnb = self.conn.ds.compute_nb(self.radius)
 
+        # compute local measure for each voxel
         self.value = np.zeros(mat.shape[0])
         for i in range(mat.shape[0]):
             self.value[i] = self.cpu(mat[i, nnb[i]])
@@ -410,7 +444,6 @@ class LocalMeasure(object):
 
         Parameters
         ----------
-        ds : DataSet object which the measure was based on
         outdir : dir to save the measures
 
 
@@ -421,11 +454,11 @@ class LocalMeasure(object):
         dim = ds.header.get_data_shape()
         value = np.zeros((dim[0], dim[1], dim[2]))
 
-        value[ds.ncoords[:,0], ds.ncoords[:,1], ds.ncoords[:,2]] = self.value
+        value[ds.ncoords[:, 0], ds.ncoords[:, 1], ds.ncoords[:, 2]] = self.value
 
         # save voxel-wise inter-module measure in 4D volume
         header = ds.header
         header['cal_max'] = value.max()
         header['cal_min'] = value.min()
         img = nib.Nifti1Image(value, None, header)
-        nib.save(img, os.path.join(outdir, self.metric + '_local.nii.gz'))
+        nib.save(img, os.path.join(outdir, '_'.join((self.ntype, 'local', self.metric)) + '.nii.gz'))
