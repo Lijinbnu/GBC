@@ -104,7 +104,7 @@ class DataSet(object):
             node = node_img.get_data()
 
             # node mask
-            nmas = node != 0
+            nmas = (node != 0)
         else:
             raise UserDefinedException('Node image and target image are not match!')
 
@@ -140,7 +140,8 @@ class DataSet(object):
         else:
             label_img = load_img(flabel_img)
             label = label_img.get_data()
-            lmas = label != 0
+
+            lmas = (label != 0)
 
             # compute label for each node
             if (node_img.shape == label_img.shape) and (nmas == lmas).all():
@@ -422,9 +423,8 @@ class LocalMeasure(object):
             mat = self.conn.mat
         else:
             mat = self.conn.mat > thr
-
-        if self.ntype == 'weighted':
-            mat = mat * self.conn.mat
+            if self.ntype == 'weighted':
+                mat = mat * self.conn.mat
 
         # compute local neighbor for each node
         nnb = self.conn.ds.compute_nb(self.radius)
