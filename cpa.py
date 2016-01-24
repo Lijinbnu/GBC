@@ -6,7 +6,6 @@ import neighbor as nb
 from scipy.spatial import  distance
 
 
-
 class UserDefinedException(Exception):
     """
     Exception defined by user
@@ -212,10 +211,6 @@ class Connectivity(object):
     def compute(self):
         """
 
-        Parameters
-        ----------
-        ds : DataSet object
-
         Returns
         -------
         self : A Connectivity object
@@ -242,6 +237,20 @@ class Connectivity(object):
             print 'Wavelet metric does not work now.'
 
         return self
+
+    def save(self, outdir='.'):
+        """
+
+        Parameters
+        ----------
+        outdir : dir to save the connectivity matrix
+
+
+        """
+        if self.ds.level == 'roi':
+            np.savetxt(os.path.join(outdir, self.metric + '.conn'), self.mat, fmt='%.3f')
+        else:
+            raise UserDefinedException('Voxel level connectivity matrix is too large to save!')
 
     def set_ds(self, ds):
         self.ds = ds
@@ -331,7 +340,6 @@ class Measure(object):
 
         Parameters
         ----------
-        ds : DataSet object which the measure was based on
         outdir : dir to save the measures
 
 
@@ -408,8 +416,6 @@ class LocalMeasure(object):
         Parameters
         ----------
         thr : threshod to remove non-interest edge, scalar
-        radius: radius for local neighbor(sphere), scalar,unit is mm
-
 
         Returns
         -------
@@ -451,7 +457,6 @@ class LocalMeasure(object):
 
 
         """
-
         ds = self.conn.ds
         # convert self.value to 3D array
         dim = ds.header.get_data_shape()
@@ -480,9 +485,7 @@ class SpatialMeasure(Measure):
         """
 
         super(SpatialMeasure, self).__init__(conn, metric, ntype)
-
         self.mtype = 'spatial'
-
 
     def compute(self, thr=None, partition=None):
         """
@@ -528,8 +531,6 @@ class SpatialMeasure(Measure):
                 self.value.append(self.cpu(sub_mat, axis=1))
 
         return self
-
-
 
     def set_conn(self, conn):
         self.conn = conn
