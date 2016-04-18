@@ -53,6 +53,13 @@ def pearson_correlation(D, w=None):
     return R
 
 
+def interquartile_range(D, dim=1):
+    q = np.percentile(D, (25, 75), axis=dim)
+    iqr = q[1, :] - q[0, :]
+
+    return iqr
+
+
 def load_img(fimg):
     """
     Load Nifti1Image
@@ -273,6 +280,9 @@ class Measure(object):
 
         elif self.metric == 'std':
             self.cpu = np.nanstd
+
+        elif self.metric == 'iqr':
+            self.cpu = interquartile_range
 
         elif self.metric == 'skewness':
             self.cpu = stats.skew

@@ -19,7 +19,7 @@ ds = DataSet(ftarg_img = targ_img_file, fnode_img = node_img_file, flabel_img=no
 conn = Connectivity(ds, metric='pearson').compute()
 
 # define and compute global measures
-# glob_meas = Measure(conn, metric='sum').compute()
+glob_meas = Measure(conn, metric='iqr').compute()
 # glob_meas.save()
 
 
