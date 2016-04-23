@@ -3,7 +3,7 @@ import nibabel as nib
 import numpy as np
 from scipy import stats
 import neighbor as nb
-from scipy.spatial import  distance
+from scipy.spatial import distance
 
 
 class UserDefinedException(Exception):
@@ -51,6 +51,13 @@ def pearson_correlation(D, w=None):
         R = c / np.sqrt(np.outer(d, d))
 
     return R
+
+
+def interquartile_range(D, axis):
+    q = np.nanpercentile(D, (25, 75), axis=1)
+    iqr = q[:, 1] - q[:, 0]
+
+    return iqr
 
 
 def load_img(fimg):
@@ -274,6 +281,9 @@ class Measure(object):
         elif self.metric == 'std':
             self.cpu = np.nanstd
 
+        elif self.metric == 'iqr':
+            self.cpu = interquartile_range
+
         elif self.metric == 'skewness':
             self.cpu = stats.skew
 
@@ -370,6 +380,9 @@ class Measure(object):
                 for j in R:
                     J = int(i * NP + j)
                     value[I[:, 0], I[:, 1], I[:, 2], J] = self.value[J]
+
+            # remove nan
+            value[np.isnan(value)] = 0
 
             # save voxelwise inter-module measure in 4D volume
             header = ds.header
