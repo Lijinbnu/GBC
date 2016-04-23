@@ -13,14 +13,16 @@ cond_file = './data/design.mat'
 
 
 # define dataset
-ds = DataSet(ftarg_img = targ_img_file, fnode_img = node_img_file, flabel_img=node_img_file, level='voxel')
+ds = DataSet(ftarg_img=targ_img_file, fnode_img=node_img_file,
+             flabel_img=label_img_file, level='voxel')
 
 # define and compute connectivity
 conn = Connectivity(ds, metric='pearson').compute()
 
+
 # define and compute global measures
 glob_meas = Measure(conn, metric='iqr').compute()
-# glob_meas.save()
+glob_meas.save()
 
 
 # define and compute local measures
@@ -29,5 +31,5 @@ glob_meas = Measure(conn, metric='iqr').compute()
 
 
 # define and compute spatial measures
-spat_meas = SpatialMeasure(conn).compute()
-spat_meas.save()
+#spat_meas = SpatialMeasure(conn).compute()
+#spat_meas.save()
