@@ -3,8 +3,7 @@ import nibabel as nib
 import numpy as np
 from scipy import stats
 import neighbor as nb
-from scipy.spatial import  distance
-
+from scipy.spatial import distance
 
 
 class UserDefinedException(Exception):
@@ -52,6 +51,13 @@ def pearson_correlation(D, w=None):
         R = c / np.sqrt(np.outer(d, d))
 
     return R
+
+
+def interquartile_range(D, axis):
+    q = np.nanpercentile(D, (25, 75), axis=1)
+    iqr = q[:, 1] - q[:, 0]
+
+    return iqr
 
 
 def load_img(fimg):
@@ -212,10 +218,6 @@ class Connectivity(object):
     def compute(self):
         """
 
-        Parameters
-        ----------
-        ds : DataSet object
-
         Returns
         -------
         self : A Connectivity object
@@ -243,6 +245,20 @@ class Connectivity(object):
 
         return self
 
+    def save(self, outdir='.'):
+        """
+
+        Parameters
+        ----------
+        outdir : dir to save the connectivity matrix
+
+
+        """
+        if self.ds.level == 'roi':
+            np.savetxt(os.path.join(outdir, self.metric + '.conn'), self.mat, fmt='%.3f')
+        else:
+            raise UserDefinedException('Voxel level connectivity matrix is too large to save!')
+
     def set_ds(self, ds):
         self.ds = ds
 
@@ -262,8 +278,14 @@ class Measure(object):
         if self.metric == 'sum':
             self.cpu = np.nansum
 
+        elif self.metric == 'mean':
+            self.cpu = np.nanmean
+
         elif self.metric == 'std':
             self.cpu = np.nanstd
+
+        elif self.metric == 'iqr':
+            self.cpu = interquartile_range
 
         elif self.metric == 'skewness':
             self.cpu = stats.skew
@@ -273,7 +295,7 @@ class Measure(object):
 
         self.conn = conn
         self.ntype = ntype
-        self.mtype = 'global' # measure type
+        self.mtype = 'global'  # measure type
 
         # these variables will be assigned in self.compute()
         self.partition = []
@@ -331,7 +353,6 @@ class Measure(object):
 
         Parameters
         ----------
-        ds : DataSet object which the measure was based on
         outdir : dir to save the measures
 
 
@@ -362,6 +383,9 @@ class Measure(object):
                 for j in R:
                     J = int(i * NP + j)
                     value[I[:, 0], I[:, 1], I[:, 2], J] = self.value[J]
+
+            # remove nan
+            value[np.isnan(value)] = 0
 
             # save voxelwise inter-module measure in 4D volume
             header = ds.header
@@ -410,8 +434,6 @@ class LocalMeasure(object):
         Parameters
         ----------
         thr : threshod to remove non-interest edge, scalar
-        radius: radius for local neighbor(sphere), scalar,unit is mm
-
 
         Returns
         -------
@@ -453,7 +475,6 @@ class LocalMeasure(object):
 
 
         """
-
         ds = self.conn.ds
         # convert self.value to 3D array
         dim = ds.header.get_data_shape()
@@ -482,9 +503,7 @@ class SpatialMeasure(Measure):
         """
 
         super(SpatialMeasure, self).__init__(conn, metric, ntype)
-
         self.mtype = 'spatial'
-
 
     def compute(self, thr=None, partition=None):
         """
@@ -530,8 +549,6 @@ class SpatialMeasure(Measure):
                 self.value.append(self.cpu(sub_mat, axis=1))
 
         return self
-
-
 
     def set_conn(self, conn):
         self.conn = conn
