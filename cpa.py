@@ -278,6 +278,9 @@ class Measure(object):
         if self.metric == 'sum':
             self.cpu = np.nansum
 
+        elif self.metric == 'mean':
+            self.cpu = np.nanmean
+
         elif self.metric == 'std':
             self.cpu = np.nanstd
 
@@ -292,7 +295,7 @@ class Measure(object):
 
         self.conn = conn
         self.ntype = ntype
-        self.mtype = 'global' # measure type
+        self.mtype = 'global'  # measure type
 
         # these variables will be assigned in self.compute()
         self.partition = []
@@ -406,6 +409,8 @@ class LocalMeasure(object):
         self.metric = metric
         if self.metric == 'sum':
             self.cpu = np.nansum
+        elif self.metric == 'mean':
+            self.cpu = np.nanmean
         elif self.metric == 'std':
             self.cpu = np.nanstd
         elif self.metric == 'skewness':
