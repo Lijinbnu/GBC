@@ -406,6 +406,8 @@ class LocalMeasure(object):
         self.metric = metric
         if self.metric == 'sum':
             self.cpu = np.nansum
+        elif self.metric == 'mean':
+            self.cpu = np.nanmean
         elif self.metric == 'std':
             self.cpu = np.nanstd
         elif self.metric == 'skewness':
