@@ -49,6 +49,9 @@ def pearson_correlation(D, w=None):
         c = np.cov(D, aweights=w)
         d = np.diag(c)
         R = c / np.sqrt(np.outer(d, d))
+    
+    # fisher-z transformation
+    R = np.arctanh
 
     return R
 
@@ -243,6 +246,9 @@ class Connectivity(object):
         elif self.metric == 'wavelet':
             print 'Wavelet metric does not work now.'
 
+        # set main diagnoal to nan
+        np.fill_diagonal(self.mat, np.nan)
+        
         return self
 
     def save(self, outdir='.'):
