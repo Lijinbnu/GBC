@@ -95,7 +95,8 @@ def main():
                         required=True)
     parser.add_argument('-labelf',
                         help='Node label file',
-                        dest='labelf')
+                        dest='labelf',
+                        required=True)
     parser.add_argument('-level',
                         help='voxel/roi level',
                         dest='level',

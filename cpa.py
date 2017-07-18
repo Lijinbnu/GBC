@@ -51,8 +51,8 @@ def pearson_correlation(D, w=None):
         R = c / np.sqrt(np.outer(d, d))
     
     # fisher-z transformation
-    R = np.arctanh
-
+    R = np.arctanh(R)
+    
     return R
 
 
